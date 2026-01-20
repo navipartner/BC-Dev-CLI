@@ -1,0 +1,118 @@
+using System.CommandLine;
+using BCDev.Models;
+using BCDev.Services;
+
+namespace BCDev.Commands;
+
+public static class TestCommand
+{
+    public static Command Create()
+    {
+        var command = new Command("test", "Run tests against Business Central");
+
+        var launchJsonPathOption = new Option<string>(
+            name: "-launchJsonPath",
+            description: "Path to launch.json file")
+        {
+            IsRequired = true
+        };
+
+        var launchJsonNameOption = new Option<string>(
+            name: "-launchJsonName",
+            description: "Configuration name in launch.json")
+        {
+            IsRequired = true
+        };
+
+        var usernameOption = new Option<string?>(
+            name: "-Username",
+            description: "Username for UserPassword authentication");
+
+        var passwordOption = new Option<string?>(
+            name: "-Password",
+            description: "Password for UserPassword authentication");
+
+        var codeunitIdOption = new Option<int?>(
+            name: "-CodeunitId",
+            description: "Specific test codeunit ID to run");
+
+        var methodNameOption = new Option<string?>(
+            name: "-MethodName",
+            description: "Specific test method name to run");
+
+        var testAllOption = new Option<bool>(
+            name: "-all",
+            description: "Run all available test codeunits",
+            getDefaultValue: () => false);
+
+        var testSuiteOption = new Option<string>(
+            name: "-testSuite",
+            description: "Test suite name (used internally)",
+            getDefaultValue: () => "DEFAULT");
+
+        var bcClientDllPathOption = new Option<string?>(
+            name: "-bcClientDllPath",
+            description: "Path to BC client DLL (uses bundled version if not specified)");
+
+        var timeoutOption = new Option<int>(
+            name: "-timeout",
+            description: "Timeout in minutes for test execution",
+            getDefaultValue: () => 30);
+
+        command.AddOption(launchJsonPathOption);
+        command.AddOption(launchJsonNameOption);
+        command.AddOption(usernameOption);
+        command.AddOption(passwordOption);
+        command.AddOption(codeunitIdOption);
+        command.AddOption(methodNameOption);
+        command.AddOption(testAllOption);
+        command.AddOption(testSuiteOption);
+        command.AddOption(bcClientDllPathOption);
+        command.AddOption(timeoutOption);
+
+        command.SetHandler(async (context) =>
+        {
+            var launchJsonPath = context.ParseResult.GetValueForOption(launchJsonPathOption)!;
+            var launchJsonName = context.ParseResult.GetValueForOption(launchJsonNameOption)!;
+            var username = context.ParseResult.GetValueForOption(usernameOption);
+            var password = context.ParseResult.GetValueForOption(passwordOption);
+            var codeunitId = context.ParseResult.GetValueForOption(codeunitIdOption);
+            var methodName = context.ParseResult.GetValueForOption(methodNameOption);
+            var testAll = context.ParseResult.GetValueForOption(testAllOption);
+            var testSuite = context.ParseResult.GetValueForOption(testSuiteOption)!;
+            var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
+            var timeout = context.ParseResult.GetValueForOption(timeoutOption);
+
+            await ExecuteAsync(launchJsonPath, launchJsonName, username, password,
+                codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeout);
+        });
+
+        return command;
+    }
+
+    private static async Task ExecuteAsync(
+        string launchJsonPath,
+        string launchJsonName,
+        string? username,
+        string? password,
+        int? codeunitId,
+        string? methodName,
+        bool testAll,
+        string testSuite,
+        string? bcClientDllPath,
+        int timeoutMinutes)
+    {
+        var testService = new TestService();
+        var result = await testService.RunTestsAsync(
+            launchJsonPath, launchJsonName, username, password,
+            codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeoutMinutes);
+
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        }));
+
+        Environment.ExitCode = result.Success ? 0 : 1;
+    }
+}
