@@ -1,0 +1,21 @@
+{
+  "id": "22222222-2222-2222-2222-222222222222",
+  "name": "Test App",
+  "publisher": "TestPublisher",
+  "version": "1.0.0.0",
+  "brief": "Test app for unit tests",
+  "description": "A minimal test app",
+  "platform": "27.0.0.0",
+  "application": "27.0.0.0",
+  "runtime": "14.0",
+  "target": "OnPrem",
+  "idRanges": [
+    {
+      "from": 50000,
+      "to": 50099
+    }
+  ],
+  "features": [
+    "NoImplicitWith"
+  ]
+}

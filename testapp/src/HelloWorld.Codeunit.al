@@ -17,4 +17,15 @@ codeunit 50100 "Hello World"
     begin
         Message(GreetingMsg);
     end;
+
+    /// <summary>
+    /// Gets the count of companies in the system.
+    /// This procedure uses Company table from Base Application to demonstrate dependency.
+    /// </summary>
+    procedure GetCompanyCount(): Integer
+    var
+        Company: Record Company;
+    begin
+        exit(Company.Count());
+    end;
 }

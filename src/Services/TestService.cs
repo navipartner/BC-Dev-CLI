@@ -28,6 +28,7 @@ public class TestService
     public class TestMethodResultDto
     {
         public string Codeunit { get; set; } = string.Empty;
+        public string CodeunitId { get; set; } = string.Empty;
         public string Function { get; set; } = string.Empty;
         public string Result { get; set; } = string.Empty;
         public string? Duration { get; set; }
@@ -94,15 +95,22 @@ public class TestService
             // Convert results to output format
             foreach (var testResult in testResults)
             {
+                // Use the parent result's Name as codeunit fallback (it contains the codeunit name)
+                var codeunitName = testResult.Name;
+
                 foreach (var methodResult in testResult.TestResults)
                 {
+                    // Use method-level CodeUnit if available, otherwise fall back to parent's Name
+                    var effectiveCodeunit = !string.IsNullOrEmpty(methodResult.CodeUnit)
+                        ? methodResult.CodeUnit
+                        : codeunitName;
+
                     var dto = new TestMethodResultDto
                     {
-                        Codeunit = methodResult.CodeUnit,
+                        Codeunit = effectiveCodeunit,
+                        CodeunitId = testResult.CodeUnit,
                         Function = methodResult.Method,
-                        Result = GetResultString(methodResult.Result),
-                        ErrorMessage = methodResult.Message,
-                        StackTrace = methodResult.StackTrace
+                        Result = GetResultString(methodResult.Result)
                     };
 
                     // Calculate duration if times are available
@@ -110,6 +118,16 @@ public class TestService
                         DateTime.TryParse(methodResult.FinishTime, out var finish))
                     {
                         dto.Duration = (finish - start).ToString(@"hh\:mm\:ss\.fff");
+                    }
+
+                    // Only include error details for failed tests
+                    if (!string.IsNullOrEmpty(methodResult.Message))
+                    {
+                        dto.ErrorMessage = methodResult.Message;
+                    }
+                    if (!string.IsNullOrEmpty(methodResult.StackTrace))
+                    {
+                        dto.StackTrace = methodResult.StackTrace;
                     }
 
                     result.Results.Add(dto);
@@ -148,7 +166,7 @@ public class TestService
         return result;
     }
 
-    private static async Task<ICredentialProvider> GetCredentialProviderAsync(
+    private static Task<ICredentialProvider> GetCredentialProviderAsync(
         LaunchConfiguration config, string? username, string? password)
     {
         if (config.Authentication == AuthenticationMethod.UserPassword)
@@ -158,15 +176,18 @@ public class TestService
                 throw new InvalidOperationException(
                     "Username and password are required for UserPassword authentication");
             }
-            return new NavUserPasswordProvider(username, password);
+            return Task.FromResult<ICredentialProvider>(new NavUserPasswordProvider(username, password));
         }
 
         if (config.Authentication == AuthenticationMethod.AAD ||
             config.Authentication == AuthenticationMethod.MicrosoftEntraID)
         {
-            var authority = $"https://login.microsoftonline.com/common";
-            var scopes = new[] { $"{config.Server}/.default" };
-            return new AadAuthProvider(authority, scopes, username: username, password: password);
+            // Use tenant-specific authority if we have a tenant domain
+            var authority = !string.IsNullOrEmpty(config.PrimaryTenantDomain)
+                ? $"https://login.microsoftonline.com/{config.PrimaryTenantDomain}"
+                : "https://login.microsoftonline.com/common";
+            var scopes = new[] { $"{config.GetServerForScope()}/.default" };
+            return Task.FromResult<ICredentialProvider>(new AadAuthProvider(authority, scopes, username: username, password: password));
         }
 
         throw new NotSupportedException($"Authentication method {config.Authentication} is not supported");

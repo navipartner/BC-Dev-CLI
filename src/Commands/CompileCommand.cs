@@ -25,24 +25,30 @@ public static class CompileCommand
 
         var packageCachePathOption = new Option<string?>(
             name: "-packageCachePath",
-            description: "Path to .alpackages folder (defaults to .alpackages in app folder)");
+            description: "Path to .alpackages folder containing symbol packages (defaults to .alpackages in app folder)");
+
+        var suppressWarningsOption = new Option<bool>(
+            name: "-suppressWarnings",
+            description: "Suppress compiler warnings from the output",
+            getDefaultValue: () => false);
 
         command.AddOption(appJsonPathOption);
         command.AddOption(compilerPathOption);
         command.AddOption(packageCachePathOption);
+        command.AddOption(suppressWarningsOption);
 
-        command.SetHandler(async (appJsonPath, compilerPath, packageCachePath) =>
+        command.SetHandler(async (appJsonPath, compilerPath, packageCachePath, suppressWarnings) =>
         {
-            await ExecuteAsync(appJsonPath, compilerPath, packageCachePath);
-        }, appJsonPathOption, compilerPathOption, packageCachePathOption);
+            await ExecuteAsync(appJsonPath, compilerPath, packageCachePath, suppressWarnings);
+        }, appJsonPathOption, compilerPathOption, packageCachePathOption, suppressWarningsOption);
 
         return command;
     }
 
-    private static async Task ExecuteAsync(string appJsonPath, string compilerPath, string? packageCachePath)
+    private static async Task ExecuteAsync(string appJsonPath, string compilerPath, string? packageCachePath, bool suppressWarnings)
     {
         var compilerService = new CompilerService();
-        var result = await compilerService.CompileAsync(appJsonPath, compilerPath, packageCachePath);
+        var result = await compilerService.CompileAsync(appJsonPath, compilerPath, packageCachePath, suppressWarnings);
 
         // Output result as JSON
         Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions

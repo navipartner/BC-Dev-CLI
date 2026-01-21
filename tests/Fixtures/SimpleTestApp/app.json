@@ -1,0 +1,20 @@
+{
+  "id": "44444444-4444-4444-4444-444444444444",
+  "name": "Simple Test App",
+  "publisher": "TestPublisher",
+  "version": "1.0.0.0",
+  "brief": "Simple app for integration tests",
+  "description": "A minimal AL app with no dependencies for testing compilation",
+  "platform": "27.0.0.0",
+  "runtime": "14.0",
+  "target": "OnPrem",
+  "idRanges": [
+    {
+      "from": 50000,
+      "to": 50099
+    }
+  ],
+  "features": [
+    "NoImplicitWith"
+  ]
+}

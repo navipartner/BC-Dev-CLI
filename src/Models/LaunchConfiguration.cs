@@ -73,11 +73,32 @@ public class LaunchConfiguration
     [JsonPropertyName("numberOfSqlStatements")]
     public int NumberOfSqlStatements { get; set; } = 10;
 
+    // SaaS-specific properties
+    [JsonPropertyName("primaryTenantDomain")]
+    public string? PrimaryTenantDomain { get; set; }
+
+    [JsonPropertyName("environmentName")]
+    public string? EnvironmentName { get; set; }
+
+    [JsonPropertyName("environmentType")]
+    public string? EnvironmentType { get; set; }
+
+    /// <summary>
+    /// Returns true if this is a SaaS (cloud) configuration
+    /// </summary>
+    public bool IsSaaS => !string.IsNullOrEmpty(PrimaryTenantDomain) && !string.IsNullOrEmpty(EnvironmentName);
+
     /// <summary>
     /// Build the client services URL from configuration
     /// </summary>
     public string GetClientServicesUrl()
     {
+        if (IsSaaS)
+        {
+            // BC SaaS URL format: https://businesscentral.dynamics.com/{tenant}/{environment}
+            return $"https://businesscentral.dynamics.com/{PrimaryTenantDomain}/{EnvironmentName}";
+        }
+
         var baseUrl = Server.TrimEnd('/');
         var tenant = string.IsNullOrEmpty(Tenant) ? "default" : Tenant;
         return $"{baseUrl}:{Port}/{ServerInstance}?tenant={tenant}";
@@ -88,9 +109,27 @@ public class LaunchConfiguration
     /// </summary>
     public string GetDevServicesUrl()
     {
+        if (IsSaaS)
+        {
+            // BC SaaS dev service URL format
+            return $"https://businesscentral.dynamics.com/{PrimaryTenantDomain}/{EnvironmentName}/dev/";
+        }
+
         var baseUrl = Server.TrimEnd('/');
         var port = Port; // Dev service typically on same port as client services
         return $"{baseUrl}:{port}/{ServerInstance}/dev/";
+    }
+
+    /// <summary>
+    /// Get the server URL for AAD scope (without path)
+    /// </summary>
+    public string GetServerForScope()
+    {
+        if (IsSaaS)
+        {
+            return "https://api.businesscentral.dynamics.com";
+        }
+        return Server;
     }
 }
 

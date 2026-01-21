@@ -36,7 +36,11 @@ public class CompilerService
     /// <summary>
     /// Compile an AL application
     /// </summary>
-    public async Task<CompileResult> CompileAsync(string appJsonPath, string compilerPath, string? packageCachePath)
+    /// <param name="appJsonPath">Path to app.json file</param>
+    /// <param name="compilerPath">Path to alc.exe compiler</param>
+    /// <param name="packageCachePath">Path to .alpackages folder</param>
+    /// <param name="suppressWarnings">If true, warnings are not included in the result</param>
+    public async Task<CompileResult> CompileAsync(string appJsonPath, string compilerPath, string? packageCachePath, bool suppressWarnings = false)
     {
         var result = new CompileResult();
 
@@ -75,7 +79,7 @@ public class CompilerService
         var appFolder = Path.GetDirectoryName(appJsonPath) ?? throw new InvalidOperationException("Invalid app.json path");
         var outputPath = Path.Combine(appFolder, appJson.GetAppFileName());
 
-        // Default package cache path
+        // Default package cache path is .alpackages in app folder
         if (string.IsNullOrEmpty(packageCachePath))
         {
             packageCachePath = Path.Combine(appFolder, ".alpackages");
@@ -123,7 +127,7 @@ public class CompilerService
             result.StdErr = stderr;
 
             // Parse compiler output for errors and warnings
-            ParseCompilerOutput(stdout + stderr, result);
+            ParseCompilerOutput(stdout + stderr, result, suppressWarnings);
 
             if (process.ExitCode == 0 && File.Exists(outputPath))
             {
@@ -146,7 +150,7 @@ public class CompilerService
         return result;
     }
 
-    private void ParseCompilerOutput(string output, CompileResult result)
+    private void ParseCompilerOutput(string output, CompileResult result, bool suppressWarnings)
     {
         // Parse compiler output lines for errors and warnings
         // Format: file(line,column): error/warning CODE: message
@@ -159,15 +163,20 @@ public class CompilerService
             var trimmed = line.Trim();
 
             // Check for error pattern
-            if (trimmed.Contains(": error ") || trimmed.Contains(": warning "))
+            if (trimmed.Contains(": error "))
             {
                 var error = ParseCompilerLine(trimmed);
                 if (error != null)
                 {
-                    if (trimmed.Contains(": error "))
-                        result.Errors.Add(error);
-                    else
-                        result.Warnings.Add(error);
+                    result.Errors.Add(error);
+                }
+            }
+            else if (trimmed.Contains(": warning ") && !suppressWarnings)
+            {
+                var warning = ParseCompilerLine(trimmed);
+                if (warning != null)
+                {
+                    result.Warnings.Add(warning);
                 }
             }
         }
