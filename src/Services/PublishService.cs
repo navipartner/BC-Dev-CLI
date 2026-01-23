@@ -117,12 +117,20 @@ public class PublishService
         using var client = new HttpClient(handler);
         client.Timeout = TimeSpan.FromMinutes(10); // Allow time for large apps
 
-        // Set up authentication header if using AAD
+        // Set up authentication header
         if (authScheme == "AzureActiveDirectory" && credentials is TokenCredential tokenCred)
         {
             var networkCred = tokenCred.GetCredential(new Uri(devServiceUrl), "Bearer");
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", networkCred.Password);
+        }
+        else if (credentials is NetworkCredential netCred)
+        {
+            // BC Dev Service requires Basic auth header to be set explicitly
+            var authBytes = Encoding.ASCII.GetBytes($"{netCred.UserName}:{netCred.Password}");
+            var authBase64 = Convert.ToBase64String(authBytes);
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Basic", authBase64);
         }
 
         // Read the app file
@@ -130,8 +138,8 @@ public class PublishService
         var appFileName = Path.GetFileName(appPath);
 
         // Build the publish endpoint URL
-        // BC Development Service endpoint: /apps/publish
-        var publishUrl = $"{devServiceUrl}apps/publish";
+        // BC Development Service endpoint: /dev/apps
+        var publishUrl = $"{devServiceUrl}apps";
 
         // Add query parameters for tenant and schema update mode
         var queryParams = new List<string>();
@@ -139,7 +147,8 @@ public class PublishService
         {
             queryParams.Add($"tenant={Uri.EscapeDataString(config.Tenant)}");
         }
-        queryParams.Add($"schemaUpdateMode={config.SchemaUpdateMode}");
+        // Use SchemaUpdateMode value from launch.json configuration
+        queryParams.Add($"SchemaUpdateMode={config.SchemaUpdateMode}");
 
         if (queryParams.Count > 0)
         {
