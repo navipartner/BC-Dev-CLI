@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "OnPrem_BC_Test",
+            "type": "al",
+            "request": "launch",
+            "server": "https://np663903.hetzner.dynamics-retail.net",
+            "port": 443,
+            "serverInstance": "BC",
+            "tenant": "default",
+            "authentication": "UserPassword",
+            "startupObjectId": 22,
+            "startupObjectType": "Page",
+            "schemaUpdateMode": "Synchronize",
+            "breakOnError": "None",
+            "launchBrowser": true,
+            "enableSqlInformationDebugger": true,
+            "enableLongRunningSqlStatements": true,
+            "longRunningSqlStatementsThreshold": 500,
+            "numberOfSqlStatements": 10
+        }
+    ]
+}
