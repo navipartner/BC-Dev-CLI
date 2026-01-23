@@ -16,6 +16,23 @@
       "enableSqlInformationDebugger": true,
       "enableLongRunningSqlStatements": true,
       "longRunningSqlStatementsThreshold": 500,
+      "numberOfSqlStatements": 10,
+      "validateServerCertificate": false
+    },
+    {
+      "name": "test_cloud",
+      "type": "al",
+      "request": "launch",
+      "primaryTenantDomain": "d4cacb47-5821-47ef-a7e5-71cfb9699e75",
+      "environmentName": "NPRetailLatestTest-BC27",
+      "environmentType": "Sandbox",
+      "authentication": "MicrosoftEntraID",
+      "schemaUpdateMode": "Synchronize",
+      "breakOnError": "None",
+      "launchBrowser": true,
+      "enableSqlInformationDebugger": true,
+      "enableLongRunningSqlStatements": true,
+      "longRunningSqlStatementsThreshold": 500,
       "numberOfSqlStatements": 10
     }
   ]

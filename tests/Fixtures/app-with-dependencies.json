@@ -1,10 +1,8 @@
 {
-  "id": "11111111-1111-1111-1111-111111111111",
-  "name": "BCDev Test App",
-  "publisher": "BCDev",
-  "version": "1.0.0.5",
-  "brief": "Test app for bcdev CLI testing",
-  "description": "A test app with intentional failures for validating bcdev test command stacktrace output",
+  "id": "33333333-3333-3333-3333-333333333333",
+  "name": "App With Dependencies",
+  "publisher": "TestPublisher",
+  "version": "2.0.0.0",
   "platform": "27.0.0.0",
   "application": "27.0.0.0",
   "runtime": "14.0",
@@ -22,8 +20,5 @@
       "publisher": "Microsoft",
       "version": "27.0.0.0"
     }
-  ],
-  "features": [
-    "NoImplicitWith"
   ]
 }

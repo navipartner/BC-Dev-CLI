@@ -54,8 +54,8 @@ public static class TestCommand
             name: "-bcClientDllPath",
             description: "Path to BC client DLL (uses bundled version if not specified)");
 
-        var timeoutOption = new Option<int>(
-            name: "-timeout",
+        var timeoutMinutesOption = new Option<int>(
+            name: "-timeoutMinutes",
             description: "Timeout in minutes for test execution",
             getDefaultValue: () => 30);
 
@@ -68,7 +68,7 @@ public static class TestCommand
         command.AddOption(testAllOption);
         command.AddOption(testSuiteOption);
         command.AddOption(bcClientDllPathOption);
-        command.AddOption(timeoutOption);
+        command.AddOption(timeoutMinutesOption);
 
         command.SetHandler(async (context) =>
         {
@@ -81,10 +81,10 @@ public static class TestCommand
             var testAll = context.ParseResult.GetValueForOption(testAllOption);
             var testSuite = context.ParseResult.GetValueForOption(testSuiteOption)!;
             var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
-            var timeout = context.ParseResult.GetValueForOption(timeoutOption);
+            var timeoutMinutes = context.ParseResult.GetValueForOption(timeoutMinutesOption);
 
             await ExecuteAsync(launchJsonPath, launchJsonName, username, password,
-                codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeout);
+                codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeoutMinutes);
         });
 
         return command;
@@ -110,7 +110,8 @@ public static class TestCommand
         Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
         {
             WriteIndented = true,
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         }));
 
         Environment.ExitCode = result.Success ? 0 : 1;

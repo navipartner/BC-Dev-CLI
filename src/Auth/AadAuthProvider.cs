@@ -15,8 +15,7 @@ public class AadAuthProvider : ICredentialProvider
     private readonly string? _password;
     private string? _cachedToken;
 
-    // Default client ID for BC client (Visual Studio Code AL Extension)
-    private const string DefaultBCClientId = "a1d332c5-84b8-4d8f-85aa-345f987d53be";
+    private const string DefaultBCClientId = ""; // TODO
 
     public AadAuthProvider(string authority, string[] scopes, string? clientId = null,
         string? username = null, string? password = null)
@@ -51,32 +50,19 @@ public class AadAuthProvider : ICredentialProvider
 
         AuthenticationResult result;
 
-        // Try username/password flow if credentials provided (for CI/CD)
-        if (!string.IsNullOrEmpty(_username) && !string.IsNullOrEmpty(_password))
+        // Use device code flow - works across tenants without explicit app consent
+        try
         {
-            try
-            {
-                result = await app.AcquireTokenByUsernamePassword(_scopes, _username, _password)
-                    .ExecuteAsync();
+            Console.Error.WriteLine("Authenticating with Microsoft Entra ID...");
+                result = await app.AcquireTokenWithDeviceCode(_scopes, deviceCodeResult =>
+                {
+                    Console.Error.WriteLine(deviceCodeResult.Message);
+                    return Task.CompletedTask;
+                }).ExecuteAsync();
             }
             catch (MsalException ex)
             {
-                throw new Exception($"AAD authentication failed: {ex.Message}", ex);
-            }
-        }
-        else
-        {
-            // Interactive flow
-            try
-            {
-                result = await app.AcquireTokenInteractive(_scopes)
-                    .WithPrompt(Prompt.SelectAccount)
-                    .ExecuteAsync();
-            }
-            catch (MsalException ex)
-            {
-                throw new Exception($"AAD interactive authentication failed: {ex.Message}", ex);
-            }
+            throw new Exception($"AAD device code authentication failed: {ex.Message}", ex);
         }
 
         _cachedToken = result.AccessToken;

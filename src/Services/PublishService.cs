@@ -32,6 +32,7 @@ public class PublishService
         string? appPath,
         string? appJsonPath,
         string? compilerPath,
+        string? packageCachePath,
         string launchJsonPath,
         string launchJsonName,
         AuthType? authType,
@@ -43,11 +44,11 @@ public class PublishService
 
         try
         {
-            // If recompile flag is set, compile first
+            // If recompile flag is set, compile first (suppress warnings for cleaner output)
             if (recompile)
             {
                 var compilerService = new CompilerService();
-                var compileResult = await compilerService.CompileAsync(appJsonPath!, compilerPath!, null);
+                var compileResult = await compilerService.CompileAsync(appJsonPath!, compilerPath!, packageCachePath, suppressWarnings: true);
 
                 if (!compileResult.Success)
                 {
@@ -196,15 +197,11 @@ public class PublishService
 
     private static string BuildDevServiceUrl(LaunchConfiguration config)
     {
-        var baseUrl = config.Server.TrimEnd('/');
-        var port = config.Port;
-        var instance = config.ServerInstance;
-
-        // Development Service typically on same port as client services
-        return $"{baseUrl}:{port}/{instance}/dev/";
+        // Use the configuration's built-in method which handles both OnPrem and SaaS
+        return config.GetDevServicesUrl();
     }
 
-    private static async Task<ICredentialProvider> GetCredentialProviderAsync(
+    private static Task<ICredentialProvider> GetCredentialProviderAsync(
         LaunchConfiguration config,
         AuthType? authType,
         string? username,
@@ -222,12 +219,14 @@ public class PublishService
                 throw new InvalidOperationException(
                     "Username and password are required for UserPassword authentication");
             }
-            return new NavUserPasswordProvider(username, password);
+            return Task.FromResult<ICredentialProvider>(new NavUserPasswordProvider(username, password));
         }
 
-        // AAD auth
-        var authority = "https://login.microsoftonline.com/common";
-        var scopes = new[] { $"{config.Server}/.default" };
-        return new AadAuthProvider(authority, scopes, username: username, password: password);
+        // AAD auth - use tenant-specific authority if we have a tenant domain
+        var authority = !string.IsNullOrEmpty(config.PrimaryTenantDomain)
+            ? $"https://login.microsoftonline.com/{config.PrimaryTenantDomain}"
+            : "https://login.microsoftonline.com/common";
+        var scopes = new[] { $"{config.GetServerForScope()}/.default" };
+        return Task.FromResult<ICredentialProvider>(new AadAuthProvider(authority, scopes, username: username, password: password));
     }
 }

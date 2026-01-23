@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "test_config",
+      "type": "al",
+      "request": "launch",
+      "server": "https://localhost",
+      "port": 7049,
+      "serverInstance": "BC",
+      "tenant": "default",
+      "authentication": "UserPassword",
+      "schemaUpdateMode": "Synchronize"
+    },
+    {
+      "name": "aad_config",
+      "type": "al",
+      "request": "launch",
+      "server": "https://businesscentral.dynamics.com",
+      "port": 443,
+      "serverInstance": "prod",
+      "tenant": "mytenant",
+      "authentication": "AAD"
+    }
+  ]
+}
