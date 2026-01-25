@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__container-use__environment_create",
+      "mcp__container-use__environment_file_write"
+    ]
+  }
+}

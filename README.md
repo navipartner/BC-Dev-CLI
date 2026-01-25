@@ -1,31 +1,8 @@
 # bcdev - Business Central Development CLI
 
-A cross-platform CLI tool for Microsoft Business Central development operations. Compile, publish, and test AL applications from any platform (macOS, Linux, Windows) without Windows-only PowerShell dependencies.
-
-## Features
-
-- **Compile** AL applications using the AL compiler (alc.exe)
-- **Publish** apps to BC via Development Service REST API
-- **Test** execution via BC's test tool page (130455)
-- **Cross-platform** - works on macOS, Linux, and Windows
-- **JSON output** - easy to parse, Claude-friendly output
-- **Multiple auth methods** - UserPassword and Azure AD/Microsoft Entra ID
-
-## Quick Start
-
-### Installation
-
-1. Download the latest release for your platform
-2. Extract to a directory in your PATH
-3. Run `bcdev --help` to verify installation
-
-Or build from source:
-
-```bash
-cd src
-dotnet build
-dotnet run -- --help
-```
+A CLI tool for Business Central developers and their agents. 
+Compile, publish, and test AL applications from any platform (macOS, Linux, Windows).
+Works the same against BC SaaS sandboxes, hosted dev environments like Alpaca or your own local containers - no need for BCContainerHelper or remote powershell on the BC server. 
 
 ### Running Tests
 
@@ -49,6 +26,7 @@ bcdev compile \
 
 ```bash
 bcdev publish \
+  -recompile \
   -appPath "/path/to/MyApp.app" \
   -launchJsonPath "/path/to/.vscode/launch.json" \
   -launchJsonName "Your Config Name" \
@@ -104,57 +82,20 @@ Run tests against Business Central.
 | `-timeout` | No | Timeout in minutes (default: 30) |
 | `-bcClientDllPath` | No | Custom BC client DLL path |
 
-*Required for UserPassword auth
+## TODO
+A -version parameter that is used to download the correct client context .dll from MS, if not already downloaded and cached.
 
-## Output Format
+Registering an entra ID application and confirming that all commands works against BC SaaS
 
-All commands output JSON to stdout:
+Polishing the three examples in the top of the README.md file
 
-```json
-{
-  "success": true,
-  "totalTests": 10,
-  "passed": 9,
-  "failed": 1,
-  "skipped": 0,
-  "duration": "00:01:23",
-  "results": [
-    {
-      "codeunit": "MyTestCodeunit",
-      "function": "TestSomething",
-      "result": "Pass",
-      "duration": "00:00:05"
-    }
-  ]
-}
-```
+Making sure the command options list in the README.md file are all up to date
 
-Exit codes:
-- `0` - Success
-- `1` - Failure
+Making a release pipeline that stores the artifacts on GitHub releases, and adding 
+a one liner script that downloads it and installs it to the path.
 
-## Requirements
+Making sure the release uses AOT and bundled runtime compilation flags, so it's a single executable even though itll be bigger.
 
-- .NET 8 runtime (bundled in self-contained builds)
-- BC Test Tool extension installed (Page 130455) for test command
-- AL compiler (alc.exe) for compile command
-- Network access to BC server for publish/test commands
+Making a polished skill.md file that can be copy pasted into claude/codex repos,
+with short scripts in README.md for automatically downloading from github to repo .md file.
 
-## Building from Source
-
-```bash
-# Debug build
-cd src
-dotnet build
-
-# Release build (self-contained)
-dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true
-
-# Other platforms
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
-dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
-```
-
-## License
-
-MIT
