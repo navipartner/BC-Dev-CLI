@@ -83,19 +83,19 @@ Run tests against Business Central.
 | `-bcClientDllPath` | No | Custom BC client DLL path |
 
 ## TODO
-A -version parameter that is used to download the correct client context .dll from MS, if not already downloaded and cached.
 
-Registering an entra ID application and confirming that all commands works against BC SaaS
+Make the project compile even without any compiler or client .dll from MS.
+The tests should trigger the download from MS in the next TODO point so they should be done together.
+
+A -version parameter that is used to download the correct client context .dll and compiler from MS, if not already downloaded and cached. If not specified, the app.json platform version should be used.
+It's important that the steps here are returned in stdout, so the user can see if its choosing to download the binaries from MS, which version, or if it re-used caches ones from disk, just to make it more transparent.
 
 Polishing the three examples in the top of the README.md file
 
 Making sure the command options list in the README.md file are all up to date
 
-Making a release pipeline that stores the artifacts on GitHub releases, and adding 
-a one liner script that downloads it and installs it to the path.
+Making a release pipeline that stores the artifacts on GitHub releases.
+It should be triggered by a new release tag on master branch.
 
 Making sure the release uses AOT and bundled runtime compilation flags, so it's a single executable even though itll be bigger.
-
-Making a polished skill.md file that can be copy pasted into claude/codex repos,
-with short scripts in README.md for automatically downloading from github to repo .md file.
 
