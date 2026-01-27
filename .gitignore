@@ -1,6 +1,9 @@
 bin/
 obj/
 
+# BC app packages
+*.app
+
 
 # Auto Claude data directory
 .auto-claude/
