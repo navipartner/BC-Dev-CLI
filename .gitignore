@@ -1,8 +1,6 @@
 bin/
 obj/
 
-# BC client DLL (auto-fetched from cache during build)
-src/libs/
 
 # Auto Claude data directory
 .auto-claude/

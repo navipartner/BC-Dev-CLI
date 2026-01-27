@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Dynamics.Framework.UI.Client;
 
 namespace BCDev.BC;
 
 /// <summary>
-/// Test runner for executing AL tests via Business Central's test tool page
+/// Test runner for executing AL tests via Business Central's test tool page.
+/// Uses late binding to avoid compile-time dependency on BC client DLL.
 /// </summary>
 public class TestRunner : ClientContext
 {
@@ -90,7 +90,7 @@ public class TestRunner : ClientContext
         InvokeAction(GetActionByName(OpenedForm!, "RunNextTest"));
 
         var testResultControl = GetControlByName(OpenedForm!, "TestResultJson");
-        var resultString = testResultControl.StringValue;
+        string resultString = testResultControl.StringValue;
 
         if (resultString == AllTestsExecutedString)
         {
@@ -174,7 +174,7 @@ public class TestRunner : ClientContext
         base.CloseSession();
     }
 
-    private ClientLogicalForm OpenTestForm(int testPage)
+    private dynamic OpenTestForm(int testPage)
     {
         var form = OpenForm(testPage);
         if (form == null)
@@ -185,31 +185,31 @@ public class TestRunner : ClientContext
         return form;
     }
 
-    private void SetTestSuite(ClientLogicalForm form, string testSuite)
+    private void SetTestSuite(dynamic form, string testSuite)
     {
         var control = GetControlByName(form, "CurrentSuiteName");
         SaveValue(control, testSuite);
     }
 
-    private void SetExtensionId(ClientLogicalForm form, string extensionId)
+    private void SetExtensionId(dynamic form, string extensionId)
     {
         var control = GetControlByName(form, "ExtensionId");
         SaveValue(control, extensionId);
     }
 
-    private void SetTestCodeunits(ClientLogicalForm form, string filter)
+    private void SetTestCodeunits(dynamic form, string filter)
     {
         var control = GetControlByName(form, "TestCodeunitRangeFilter");
         SaveValue(control, filter);
     }
 
-    private void SetTestProcedures(ClientLogicalForm form, string filter)
+    private void SetTestProcedures(dynamic form, string filter)
     {
         var control = GetControlByName(form, "TestProcedureRangeFilter");
         SaveValue(control, filter);
     }
 
-    private void SetTestRunner(ClientLogicalForm form, int testRunnerId)
+    private void SetTestRunner(dynamic form, int testRunnerId)
     {
         if (testRunnerId == 0) return;
 
@@ -217,7 +217,7 @@ public class TestRunner : ClientContext
         SaveValue(control, testRunnerId.ToString());
     }
 
-    private void ClearTestResults(ClientLogicalForm form)
+    private void ClearTestResults(dynamic form)
     {
         InvokeAction(GetActionByName(form, "ClearTestResults"));
     }

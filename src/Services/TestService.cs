@@ -48,7 +48,6 @@ public class TestService
         string? methodName,
         bool testAll,
         string testSuite,
-        string? bcClientDllPath,
         int timeoutMinutes)
     {
         var result = new TestRunResult();
@@ -56,10 +55,6 @@ public class TestService
 
         try
         {
-            // Setup assembly resolver for BC client DLL
-            var dllPath = bcClientDllPath ?? AssemblyResolver.GetDefaultLibsPath();
-            AssemblyResolver.SetupAssemblyResolve("Microsoft.Dynamics", dllPath);
-
             // Load launch configuration
             var launchConfigService = new LaunchConfigService();
             var config = launchConfigService.GetConfiguration(launchJsonPath, launchJsonName);
@@ -73,6 +68,7 @@ public class TestService
             var timeout = TimeSpan.FromMinutes(timeoutMinutes);
 
             // Create test runner and run tests
+            // BCClientLoader handles downloading/loading the BC client DLL automatically
             using var runner = new TestRunner(serviceUrl, credentialProvider.AuthenticationScheme,
                 credentials, timeout);
 

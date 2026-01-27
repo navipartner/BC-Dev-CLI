@@ -1,5 +1,5 @@
 using System.CommandLine;
-using BCDev.Models;
+using BCDev.BC;
 using BCDev.Services;
 
 namespace BCDev.Commands;
@@ -79,21 +79,20 @@ public static class TestCommand
             var testSuite = context.ParseResult.GetValueForOption(testSuiteOption)!;
             var timeoutMinutes = context.ParseResult.GetValueForOption(timeoutMinutesOption);
 
-            // Auto-download BC client DLL based on app.json platform version
-            var bcClientDllPath = await EnsureBCClientDllAsync(launchJsonPath);
+            // Determine BC version from app.json and set it for BCClientLoader
+            await SetBCVersionFromAppJsonAsync(launchJsonPath);
 
             await ExecuteAsync(launchJsonPath, launchJsonName, username, password,
-                codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeoutMinutes);
+                codeunitId, methodName, testAll, testSuite, timeoutMinutes);
         });
 
         return command;
     }
 
     /// <summary>
-    /// Ensures BC client DLL is available, downloading if needed.
-    /// Tries to find app.json in the same folder as launch.json to determine version.
+    /// Determines BC version from app.json and configures BCClientLoader.
     /// </summary>
-    private static async Task<string?> EnsureBCClientDllAsync(string launchJsonPath)
+    private static async Task SetBCVersionFromAppJsonAsync(string launchJsonPath)
     {
         var artifactService = new ArtifactService();
         string version;
@@ -113,8 +112,8 @@ public static class TestCommand
             Console.WriteLine($"No app.json found, using default BC version {version}");
         }
 
-        await artifactService.EnsureArtifactsAsync(version);
-        return artifactService.GetCachedClientDllPath(version);
+        // Set the version for BCClientLoader - it will download if needed
+        BCClientLoader.Version = version;
     }
 
     private static async Task ExecuteAsync(
@@ -126,13 +125,12 @@ public static class TestCommand
         string? methodName,
         bool testAll,
         string testSuite,
-        string? bcClientDllPath,
         int timeoutMinutes)
     {
         var testService = new TestService();
         var result = await testService.RunTestsAsync(
             launchJsonPath, launchJsonName, username, password,
-            codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeoutMinutes);
+            codeunitId, methodName, testAll, testSuite, timeoutMinutes);
 
         Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
         {
