@@ -8,6 +8,8 @@ namespace BCDev.BC;
 /// Client context for connecting to Business Central.
 /// Uses late binding to avoid compile-time dependency on BC client DLL.
 /// </summary>
+[RequiresUnreferencedCode("BC client context uses reflection for late binding")]
+[RequiresDynamicCode("BC client context uses dynamic code generation")]
 public class ClientContext : IDisposable
 {
     protected dynamic ClientSession { get; private set; } = null!;
