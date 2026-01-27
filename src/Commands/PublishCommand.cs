@@ -132,13 +132,9 @@ public static class PublishCommand
         var publishService = new PublishService();
         var result = await publishService.PublishAsync(
             recompile, appPath, appJsonPath, compilerPath, packageCachePath,
-            launchJsonPath, launchJsonName, authType, username, password, bcClientDllPath);
+            launchJsonPath, launchJsonName, username, password, bcClientDllPath);
 
-        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-        }));
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, JsonContext.Default.PublishResult));
 
         Environment.ExitCode = result.Success ? 0 : 1;
     }
