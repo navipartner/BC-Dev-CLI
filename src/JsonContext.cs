@@ -7,7 +7,7 @@ using BCDev.Services;
 namespace BCDev;
 
 /// <summary>
-/// Source-generated JSON serializer context for AOT compatibility
+/// Source-generated JSON serializer context for better performance
 /// </summary>
 [JsonSourceGenerationOptions(
     WriteIndented = true,

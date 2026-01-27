@@ -82,20 +82,26 @@ Run tests against Business Central.
 | `-timeout` | No | Timeout in minutes (default: 30) |
 | `-bcClientDllPath` | No | Custom BC client DLL path |
 
-## TODO
+### `bcdev symbols`
 
-Make the project compile even without any compiler or client .dll from MS.
-The tests should trigger the download from MS in the next TODO point so they should be done together.
+Download symbol packages from Business Central for compilation dependencies.
 
-A -version parameter that is used to download the correct client context .dll and compiler from MS, if not already downloaded and cached. If not specified, the app.json platform version should be used.
-It's important that the steps here are returned in stdout, so the user can see if its choosing to download the binaries from MS, which version, or if it re-used caches ones from disk, just to make it more transparent.
+```bash
+bcdev symbols \
+  -appJsonPath "/path/to/app.json" \
+  -launchJsonPath "/path/to/.vscode/launch.json" \
+  -launchJsonName "Your Config Name" \
+  -Username "bcuser" \
+  -Password "bcpassword"
+```
 
-Polishing the three examples in the top of the README.md file
+| Option | Required | Description |
+|--------|----------|-------------|
+| `-appJsonPath` | Yes | Path to app.json file |
+| `-launchJsonPath` | Yes | Path to launch.json |
+| `-launchJsonName` | Yes | Configuration name |
+| `-packageCachePath` | No | Output folder (defaults to .alpackages next to app.json) |
+| `-Username` | No* | Username |
+| `-Password` | No* | Password |
 
-Making sure the command options list in the README.md file are all up to date
-
-Making a release pipeline that stores the artifacts on GitHub releases.
-It should be triggered by a new release tag on master branch.
-
-Making sure the release uses AOT and bundled runtime compilation flags, so it's a single executable even though itll be bigger.
-
+*Required for UserPassword auth
