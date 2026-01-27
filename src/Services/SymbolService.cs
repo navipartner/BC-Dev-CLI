@@ -197,7 +197,11 @@ public class SymbolService
     /// </summary>
     public static string BuildPackageUrl(LaunchConfiguration config, string publisher, string name, string version, string? appId)
     {
-        var baseUrl = config.GetDevServicesUrl().TrimEnd('/');
+        var baseUrl = config.GetDevServicesUrl();
+        if (!baseUrl.EndsWith('/'))
+        {
+            baseUrl += "/";
+        }
         var tenant = config.Tenant ?? "default";
 
         var queryParams = new List<string>
