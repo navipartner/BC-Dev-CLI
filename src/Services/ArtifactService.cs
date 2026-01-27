@@ -117,10 +117,8 @@ public class ArtifactService
         }
 
         var json = await File.ReadAllTextAsync(appJsonPath);
-        var appJson = JsonSerializer.Deserialize<AppJson>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? throw new InvalidOperationException("Failed to parse app.json");
+        var appJson = JsonSerializer.Deserialize(json, JsonContext.Default.AppJson)
+            ?? throw new InvalidOperationException("Failed to parse app.json");
 
         if (string.IsNullOrEmpty(appJson.Platform))
         {
