@@ -85,7 +85,7 @@ public static class PublishCommand
             var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
 
             await ExecuteAsync(recompile, appPath, appJsonPath, compilerPath, packageCachePath,
-                launchJsonPath, launchJsonName, authType, username, password, bcClientDllPath);
+                launchJsonPath, launchJsonName, username, password, bcClientDllPath);
         });
 
         return command;
