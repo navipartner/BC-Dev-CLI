@@ -28,6 +28,10 @@ namespace BCDev;
 [JsonSerializable(typeof(VersionInfo))]
 [JsonSerializable(typeof(List<VersionInfo>))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
+[JsonSerializable(typeof(TestRunnerResult))]
+[JsonSerializable(typeof(TestMethodResultData))]
+[JsonSerializable(typeof(List<TestRunnerResult>))]
+[JsonSerializable(typeof(List<TestMethodResultData>))]
 internal partial class JsonContext : JsonSerializerContext
 {
 }
