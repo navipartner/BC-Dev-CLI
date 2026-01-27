@@ -80,7 +80,6 @@ public static class PublishCommand
             var packageCachePath = context.ParseResult.GetValueForOption(packageCachePathOption);
             var launchJsonPath = context.ParseResult.GetValueForOption(launchJsonPathOption)!;
             var launchJsonName = context.ParseResult.GetValueForOption(launchJsonNameOption)!;
-            var authType = context.ParseResult.GetValueForOption(authTypeOption);
             var username = context.ParseResult.GetValueForOption(usernameOption);
             var password = context.ParseResult.GetValueForOption(passwordOption);
             var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
