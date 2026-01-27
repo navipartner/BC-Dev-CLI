@@ -32,6 +32,9 @@ namespace BCDev;
 [JsonSerializable(typeof(TestMethodResultData))]
 [JsonSerializable(typeof(List<TestRunnerResult>))]
 [JsonSerializable(typeof(List<TestMethodResultData>))]
+[JsonSerializable(typeof(SymbolsResult))]
+[JsonSerializable(typeof(SymbolFailure))]
+[JsonSerializable(typeof(List<SymbolFailure>))]
 internal partial class JsonContext : JsonSerializerContext
 {
 }
