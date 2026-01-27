@@ -111,11 +111,7 @@ public class TestRunner : ClientContext
             return null;
         }
 
-        return JsonSerializer.Deserialize<TestRunnerResult>(resultString, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString
-        });
+        return JsonSerializer.Deserialize<TestRunnerResult>(resultString, TestRunnerJsonOptions.Options);
     }
 
     /// <summary>
