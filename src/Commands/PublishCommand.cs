@@ -67,7 +67,6 @@ public static class PublishCommand
         command.AddOption(packageCachePathOption);
         command.AddOption(launchJsonPathOption);
         command.AddOption(launchJsonNameOption);
-        command.AddOption(authTypeOption);
         command.AddOption(usernameOption);
         command.AddOption(passwordOption);
         command.AddOption(bcClientDllPathOption);
