@@ -16,13 +16,6 @@ public static class CompileCommand
             IsRequired = true
         };
 
-        var compilerPathOption = new Option<string>(
-            name: "-compilerPath",
-            description: "Path to alc.exe compiler")
-        {
-            IsRequired = true
-        };
-
         var packageCachePathOption = new Option<string?>(
             name: "-packageCachePath",
             description: "Path to .alpackages folder containing symbol packages (defaults to .alpackages in app folder)");
@@ -33,20 +26,26 @@ public static class CompileCommand
             getDefaultValue: () => false);
 
         command.AddOption(appJsonPathOption);
-        command.AddOption(compilerPathOption);
         command.AddOption(packageCachePathOption);
         command.AddOption(suppressWarningsOption);
 
-        command.SetHandler(async (appJsonPath, compilerPath, packageCachePath, suppressWarnings) =>
+        command.SetHandler(async (appJsonPath, packageCachePath, suppressWarnings) =>
         {
-            await ExecuteAsync(appJsonPath, compilerPath, packageCachePath, suppressWarnings);
-        }, appJsonPathOption, compilerPathOption, packageCachePathOption, suppressWarningsOption);
+            await ExecuteAsync(appJsonPath, packageCachePath, suppressWarnings);
+        }, appJsonPathOption, packageCachePathOption, suppressWarningsOption);
 
         return command;
     }
 
-    private static async Task ExecuteAsync(string appJsonPath, string compilerPath, string? packageCachePath, bool suppressWarnings)
+    private static async Task ExecuteAsync(string appJsonPath, string? packageCachePath, bool suppressWarnings)
     {
+        // Auto-download compiler based on app.json platform version
+        var artifactService = new ArtifactService();
+        var version = await artifactService.ResolveVersionFromAppJsonAsync(appJsonPath);
+        await artifactService.EnsureArtifactsAsync(version);
+        var compilerPath = artifactService.GetCachedCompilerPath(version)
+            ?? throw new InvalidOperationException($"Failed to get compiler path for version {version}");
+
         var compilerService = new CompilerService();
         var result = await compilerService.CompileAsync(appJsonPath, compilerPath, packageCachePath, suppressWarnings);
 

@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact: bcdev-win-x64.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: bcdev-linux-x64
+          - os: ubuntu-latest
+            rid: linux-arm64
+            artifact: bcdev-linux-arm64
+          - os: macos-latest
+            rid: osx-x64
+            artifact: bcdev-osx-x64
+          - os: macos-latest
+            rid: osx-arm64
+            artifact: bcdev-osx-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/bcdev.csproj
+
+      - name: Publish AOT
+        run: |
+          dotnet publish src/bcdev.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            -p:PublishAot=true \
+            -o publish
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          if [ "${{ matrix.rid }}" == "win-x64" ]; then
+            cp publish/bcdev.exe ${{ matrix.artifact }}
+          else
+            cp publish/bcdev ${{ matrix.artifact }}
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/bcdev-win-x64.exe/bcdev-win-x64.exe
+            artifacts/bcdev-linux-x64/bcdev-linux-x64
+            artifacts/bcdev-linux-arm64/bcdev-linux-arm64
+            artifacts/bcdev-osx-x64/bcdev-osx-x64
+            artifacts/bcdev-osx-arm64/bcdev-osx-arm64

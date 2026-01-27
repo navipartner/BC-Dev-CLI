@@ -39,17 +39,59 @@ public static class AssemblyResolver
     }
 
     /// <summary>
-    /// Get the default libs path (next to the executable)
+    /// Get the default libs path. Checks in order:
+    /// 1. Local libs folder (next to executable)
+    /// 2. BC artifact cache (any cached version)
     /// </summary>
     public static string GetDefaultLibsPath()
     {
-        // Use AppContext.BaseDirectory for single-file app compatibility
+        // First try local libs folder
         var basePath = AppContext.BaseDirectory;
         if (string.IsNullOrEmpty(basePath))
         {
             basePath = Environment.CurrentDirectory;
         }
-        return Path.Combine(basePath, "libs");
+        var localLibs = Path.Combine(basePath, "libs");
+        if (Directory.Exists(localLibs) && Directory.GetFiles(localLibs, "*.dll").Length > 0)
+        {
+            return localLibs;
+        }
+
+        // Fall back to BC artifact cache
+        var cacheDir = GetBCCacheDirectory();
+        if (Directory.Exists(cacheDir))
+        {
+            // Find any cached version that has the client DLL
+            var versionDirs = Directory.GetDirectories(cacheDir);
+            foreach (var versionDir in versionDirs)
+            {
+                var clientDll = Path.Combine(versionDir, "Microsoft.Dynamics.Framework.UI.Client.dll");
+                if (File.Exists(clientDll))
+                {
+                    return versionDir;
+                }
+            }
+        }
+
+        // Return local libs path (will fail gracefully later if missing)
+        return localLibs;
+    }
+
+    /// <summary>
+    /// Get the BC artifact cache directory path
+    /// </summary>
+    public static string GetBCCacheDirectory()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            return Path.Combine(localAppData, "bcdev", "cache");
+        }
+        else
+        {
+            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return Path.Combine(homeDir, ".bcdev", "cache");
+        }
     }
 
     private static string? FindFileInDirectory(string fileName, string? directoryPath)

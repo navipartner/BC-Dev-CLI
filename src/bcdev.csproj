@@ -13,6 +13,10 @@
     <SelfContained>true</SelfContained>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- BC artifact cache directory -->
+    <BCCacheDir Condition="'$(OS)' == 'Windows_NT'">$(LOCALAPPDATA)\bcdev\cache</BCCacheDir>
+    <BCCacheDir Condition="'$(OS)' != 'Windows_NT'">$(HOME)/.bcdev/cache</BCCacheDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,17 +24,36 @@
     <PackageReference Include="System.ServiceModel.Primitives" Version="8.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-
-    <!-- BC Client DLL reference -->
-    <Reference Include="Microsoft.Dynamics.Framework.UI.Client">
-      <HintPath>libs/Microsoft.Dynamics.Framework.UI.Client.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
   </ItemGroup>
 
-  <!-- Copy libs folder to output -->
-  <ItemGroup>
-    <None Include="libs/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="libs" />
-  </ItemGroup>
+  <!-- Find BC Client DLL in cache and reference it directly (no copying) -->
+  <Target Name="FindBCClientDll" BeforeTargets="BeforeBuild;BeforeResolveReferences">
+    <ItemGroup>
+      <CachedBCClientDll Include="$(BCCacheDir)/**/Microsoft.Dynamics.Framework.UI.Client.dll" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <BCClientDllPath>@(CachedBCClientDll->'%(FullPath)', '')</BCClientDllPath>
+      <!-- Take first match if multiple versions cached -->
+      <BCClientDllPath>$([System.String]::new('$(BCClientDllPath)').Split(';')[0])</BCClientDllPath>
+    </PropertyGroup>
+
+    <Message
+      Importance="high"
+      Text="Using BC client DLL from cache: $(BCClientDllPath)"
+      Condition="'$(BCClientDllPath)' != ''" />
+
+    <Error
+      Text="BC client DLL not found in cache. Run 'bcdev compile -appJsonPath &lt;path&gt;' on any AL project first to auto-download BC artifacts to $(BCCacheDir)"
+      Condition="'$(BCClientDllPath)' == ''" />
+
+    <!-- Add reference dynamically -->
+    <ItemGroup Condition="'$(BCClientDllPath)' != ''">
+      <Reference Include="Microsoft.Dynamics.Framework.UI.Client">
+        <HintPath>$(BCClientDllPath)</HintPath>
+        <Private>false</Private>
+      </Reference>
+    </ItemGroup>
+  </Target>
 
 </Project>

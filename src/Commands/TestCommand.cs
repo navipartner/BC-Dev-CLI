@@ -6,6 +6,8 @@ namespace BCDev.Commands;
 
 public static class TestCommand
 {
+    private const string DefaultBCVersion = "27.0";
+
     public static Command Create()
     {
         var command = new Command("test", "Run tests against Business Central");
@@ -50,10 +52,6 @@ public static class TestCommand
             description: "Test suite name (used internally)",
             getDefaultValue: () => "DEFAULT");
 
-        var bcClientDllPathOption = new Option<string?>(
-            name: "-bcClientDllPath",
-            description: "Path to BC client DLL (uses bundled version if not specified)");
-
         var timeoutMinutesOption = new Option<int>(
             name: "-timeoutMinutes",
             description: "Timeout in minutes for test execution",
@@ -67,7 +65,6 @@ public static class TestCommand
         command.AddOption(methodNameOption);
         command.AddOption(testAllOption);
         command.AddOption(testSuiteOption);
-        command.AddOption(bcClientDllPathOption);
         command.AddOption(timeoutMinutesOption);
 
         command.SetHandler(async (context) =>
@@ -80,14 +77,44 @@ public static class TestCommand
             var methodName = context.ParseResult.GetValueForOption(methodNameOption);
             var testAll = context.ParseResult.GetValueForOption(testAllOption);
             var testSuite = context.ParseResult.GetValueForOption(testSuiteOption)!;
-            var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
             var timeoutMinutes = context.ParseResult.GetValueForOption(timeoutMinutesOption);
+
+            // Auto-download BC client DLL based on app.json platform version
+            var bcClientDllPath = await EnsureBCClientDllAsync(launchJsonPath);
 
             await ExecuteAsync(launchJsonPath, launchJsonName, username, password,
                 codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeoutMinutes);
         });
 
         return command;
+    }
+
+    /// <summary>
+    /// Ensures BC client DLL is available, downloading if needed.
+    /// Tries to find app.json in the same folder as launch.json to determine version.
+    /// </summary>
+    private static async Task<string?> EnsureBCClientDllAsync(string launchJsonPath)
+    {
+        var artifactService = new ArtifactService();
+        string version;
+
+        // Try to find app.json in the same folder as launch.json
+        var launchDir = Path.GetDirectoryName(launchJsonPath);
+        var appJsonPath = launchDir != null ? Path.Combine(launchDir, "..", "app.json") : null;
+
+        if (appJsonPath != null && File.Exists(appJsonPath))
+        {
+            version = await artifactService.ResolveVersionFromAppJsonAsync(appJsonPath);
+        }
+        else
+        {
+            // Use default version if no app.json found
+            version = DefaultBCVersion;
+            Console.WriteLine($"No app.json found, using default BC version {version}");
+        }
+
+        await artifactService.EnsureArtifactsAsync(version);
+        return artifactService.GetCachedClientDllPath(version);
     }
 
     private static async Task ExecuteAsync(
