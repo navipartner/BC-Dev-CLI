@@ -39,6 +39,7 @@ jobs:
         run: dotnet restore src/bcdev.csproj
 
       - name: Publish AOT
+        shell: bash
         run: |
           dotnet publish src/bcdev.csproj \
             -c Release \
