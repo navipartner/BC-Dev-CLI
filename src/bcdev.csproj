@@ -20,17 +20,6 @@
     <PackageReference Include="System.ServiceModel.Primitives" Version="8.0.0" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-
-    <!-- BC Client DLL reference -->
-    <Reference Include="Microsoft.Dynamics.Framework.UI.Client">
-      <HintPath>libs/Microsoft.Dynamics.Framework.UI.Client.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-  </ItemGroup>
-
-  <!-- Copy libs folder to output -->
-  <ItemGroup>
-    <None Include="libs/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="libs" />
   </ItemGroup>
 
 </Project>

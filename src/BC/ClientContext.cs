@@ -1,21 +1,27 @@
 using System.Net;
 using System.Reflection;
-using Microsoft.Dynamics.Framework.UI.Client;
-using Microsoft.Dynamics.Framework.UI.Client.Interactions;
 
 namespace BCDev.BC;
 
 /// <summary>
-/// Client context for connecting to Business Central
+/// Client context for connecting to Business Central.
+/// Uses late binding to avoid compile-time dependency on BC client DLL.
 /// </summary>
 public class ClientContext : IDisposable
 {
-    protected ClientSession ClientSession { get; private set; } = null!;
+    protected dynamic ClientSession { get; private set; } = null!;
     protected string Culture { get; private set; } = "en-US";
-    internal ClientLogicalForm? OpenedForm { get; private set; }
+    internal dynamic? OpenedForm { get; private set; }
     protected string OpenedFormName { get; private set; } = "";
-    private ClientLogicalForm? _caughtForm;
+    private dynamic? _caughtForm;
     protected bool IgnoreErrors { get; private set; } = true;
+
+    // Cached enum values for performance
+    private static object? _stateReady;
+    private static object? _stateBusy;
+    private static object? _stateInError;
+    private static object? _stateTimedOut;
+    private static object? _stateUninitialized;
 
     public string SessionId
     {
@@ -27,22 +33,25 @@ public class ClientContext : IDisposable
         }
     }
 
-    public ClientContext(string serviceUrl, AuthenticationScheme authenticationScheme, ICredentials credential,
+    public ClientContext(string serviceUrl, string authenticationScheme, ICredentials credential,
         TimeSpan interactionTimeout, string culture = "en-US")
     {
         Initialize(serviceUrl, authenticationScheme, credential, interactionTimeout, culture);
     }
 
-    public ClientContext(string serviceUrl, string authenticationScheme, ICredentials credential,
-        TimeSpan interactionTimeout, string culture = "en-US")
-    {
-        var auth = (AuthenticationScheme)Enum.Parse(typeof(AuthenticationScheme), authenticationScheme);
-        Initialize(serviceUrl, auth, credential, interactionTimeout, culture);
-    }
-
-    private void Initialize(string serviceUrl, AuthenticationScheme authenticationScheme, ICredentials credential,
+    private void Initialize(string serviceUrl, string authenticationScheme, ICredentials credential,
         TimeSpan interactionTimeout, string culture)
     {
+        // Ensure BC client is loaded (downloads if needed)
+        BCClientLoader.EnsureLoadedAsync().GetAwaiter().GetResult();
+
+        // Cache enum values
+        _stateReady ??= BCClientLoader.GetSessionState("Ready");
+        _stateBusy ??= BCClientLoader.GetSessionState("Busy");
+        _stateInError ??= BCClientLoader.GetSessionState("InError");
+        _stateTimedOut ??= BCClientLoader.GetSessionState("TimedOut");
+        _stateUninitialized ??= BCClientLoader.GetSessionState("Uninitialized");
+
         // Configure keep-alive for long-running operations
         ServicePointManager.SetTcpKeepAlive(true,
             (int)TimeSpan.FromMinutes(120).TotalMilliseconds,
@@ -54,17 +63,30 @@ public class ClientContext : IDisposable
         var clientServicesUrl = EnsureClientServicesPath(serviceUrl);
         var addressUri = new Uri(clientServicesUrl);
 
-        var jsonClient = new JsonHttpClient(addressUri, credential, authenticationScheme)
-            ?? throw new Exception("Failed to create JsonHttpClient");
+        // Get AuthenticationScheme enum value
+        var authScheme = BCClientLoader.GetEnumValue("AuthenticationScheme", authenticationScheme);
+
+        // Create JsonHttpClient using reflection to handle different constructor signatures
+        var jsonClientType = BCClientLoader.GetClientType("JsonHttpClient");
+        dynamic jsonClient = CreateJsonHttpClient(jsonClientType, addressUri, credential, authScheme);
 
         // Set timeout on the HTTP client via reflection
-        var httpClientField = typeof(JsonHttpClient).GetField("httpClient", BindingFlags.NonPublic | BindingFlags.Instance)
+        var httpClientField = jsonClientType.GetField("httpClient", BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new Exception("Could not find httpClient field");
         var httpClient = httpClientField.GetValue(jsonClient) as HttpClient
             ?? throw new Exception("Could not get httpClient instance");
         httpClient.Timeout = interactionTimeout;
 
-        ClientSession = new ClientSession(jsonClient, new NonDispatcher(), new TimerFactory<TaskTimer>());
+        // Create NonDispatcher and TimerFactory
+        var nonDispatcher = BCClientLoader.CreateInstance("NonDispatcher");
+        var timerFactoryType = BCClientLoader.GetClientType("TimerFactory`1");
+        var taskTimerType = BCClientLoader.GetClientType("TaskTimer");
+        var timerFactoryGenericType = timerFactoryType.MakeGenericType(taskTimerType);
+        var timerFactory = Activator.CreateInstance(timerFactoryGenericType)!;
+
+        // Create ClientSession
+        var sessionType = BCClientLoader.ClientSessionType;
+        ClientSession = Activator.CreateInstance(sessionType, jsonClient, nonDispatcher, timerFactory)!;
         Culture = culture;
 
         OpenSession();
@@ -79,7 +101,6 @@ public class ClientContext : IDisposable
 
         if (url.Contains("?"))
         {
-            // Insert /cs/ before the query string
             var queryIndex = url.LastIndexOf('?');
             var pathPart = url.Substring(0, queryIndex).TrimEnd('/');
             var queryPart = url.Substring(queryIndex);
@@ -91,30 +112,37 @@ public class ClientContext : IDisposable
 
     protected void OpenSession()
     {
-        var csParams = new ClientSessionParameters
-        {
-            CultureId = Culture,
-            UICultureId = Culture
-        };
+        // Create ClientSessionParameters
+        dynamic csParams = BCClientLoader.CreateInstance("ClientSessionParameters");
+        csParams.CultureId = Culture;
+        csParams.UICultureId = Culture;
         csParams.AdditionalSettings.Add("IncludeControlIdentifier", true);
 
-        ClientSession.MessageToShow += OnMessageToShow;
-        ClientSession.CommunicationError += OnCommunicationError;
-        ClientSession.UnhandledException += OnUnhandledException;
-        ClientSession.InvalidCredentialsError += OnInvalidCredentialsError;
-        ClientSession.UriToShow += OnUriToShow;
-        ClientSession.DialogToShow += OnDialogToShow;
+        // Subscribe to events using reflection (required for late binding)
+        // Cast to object to avoid dynamic dispatch which doesn't allow method groups
+        object session = ClientSession;
+        SubscribeToEvent(session, "MessageToShow", OnMessageToShow);
+        SubscribeToEvent(session, "CommunicationError", OnCommunicationError);
+        SubscribeToEvent(session, "UnhandledException", OnUnhandledException);
+        SubscribeToEvent(session, "InvalidCredentialsError", OnInvalidCredentialsError);
+        SubscribeToEvent(session, "UriToShow", OnUriToShow);
+        SubscribeToEvent(session, "DialogToShow", OnDialogToShow);
 
         ClientSession.OpenSessionAsync(csParams);
-        AwaitState(ClientSessionState.Ready);
+        AwaitState(_stateReady!);
     }
 
     public virtual void CloseSession()
     {
         if (ClientSession != null)
         {
-            if (ClientSession.State.HasFlag(ClientSessionState.Ready | ClientSessionState.Busy |
-                                            ClientSessionState.InError | ClientSessionState.TimedOut))
+            var state = (int)ClientSession.State;
+            var ready = (int)_stateReady!;
+            var busy = (int)_stateBusy!;
+            var inError = (int)_stateInError!;
+            var timedOut = (int)_stateTimedOut!;
+
+            if ((state & (ready | busy | inError | timedOut)) != 0)
             {
                 CloseAllForms();
                 OpenedForm = null;
@@ -129,19 +157,21 @@ public class ClientContext : IDisposable
         IgnoreErrors = ignoreServerErrors;
     }
 
-    protected void AwaitState(ClientSessionState state)
+    protected void AwaitState(object state)
     {
-        while (ClientSession.State != state)
+        while (!ClientSession.State.Equals(state))
         {
             Thread.Sleep(100);
 
-            var exceptionMessage = ClientSession.State switch
-            {
-                ClientSessionState.InError => "ClientSession in Error state",
-                ClientSessionState.TimedOut => "ClientSession timed out",
-                ClientSessionState.Uninitialized => "ClientSession is Uninitialized",
-                _ => ""
-            };
+            var currentState = ClientSession.State;
+            string exceptionMessage = "";
+
+            if (currentState.Equals(_stateInError))
+                exceptionMessage = "ClientSession in Error state";
+            else if (currentState.Equals(_stateTimedOut))
+                exceptionMessage = "ClientSession timed out";
+            else if (currentState.Equals(_stateUninitialized))
+                exceptionMessage = "ClientSession is Uninitialized";
 
             if (!string.IsNullOrEmpty(exceptionMessage))
             {
@@ -155,10 +185,9 @@ public class ClientContext : IDisposable
     {
         try
         {
-            dynamic session = ClientSession;
-            if (HasProperty(session, "LastException") && session.LastException != null)
+            if (HasProperty(ClientSession, "LastException") && ClientSession.LastException != null)
             {
-                return session.LastException.ToString();
+                return ClientSession.LastException.ToString();
             }
         }
         catch
@@ -168,16 +197,20 @@ public class ClientContext : IDisposable
         return "";
     }
 
-    public ClientLogicalForm OpenForm(int page)
+    public dynamic OpenForm(int page)
     {
-        if (OpenedForm == null || string.IsNullOrEmpty(OpenedForm.Name) || OpenedForm.Name != OpenedFormName)
+        var currentForm = OpenedForm;
+        var currentFormName = currentForm?.Name as string;
+
+        if (currentForm == null || string.IsNullOrEmpty(currentFormName) || currentFormName != OpenedFormName)
         {
-            if (OpenedForm != null && OpenedForm.Name != OpenedFormName)
+            if (currentForm != null && currentFormName != OpenedFormName)
             {
-                CloseForm(OpenedForm);
+                CloseForm(currentForm);
             }
 
-            var interaction = new OpenFormInteraction { Page = page.ToString() };
+            var interaction = BCClientLoader.CreateInteraction("OpenFormInteraction");
+            interaction.Page = page.ToString();
             OpenedForm = InvokeInteractionAndCatchForm(interaction);
 
             if (OpenedForm == null)
@@ -187,47 +220,61 @@ public class ClientContext : IDisposable
 
             OpenedFormName = OpenedForm.Name;
         }
-        return OpenedForm;
+        return OpenedForm!;
     }
 
     public void CloseOpenedForm()
     {
         if (OpenedForm != null)
         {
-            InvokeInteraction(new CloseFormInteraction(OpenedForm));
+            var interaction = BCClientLoader.CreateInteraction("CloseFormInteraction", OpenedForm);
+            InvokeInteraction(interaction);
             OpenedForm = null;
             OpenedFormName = "";
         }
     }
 
-    public void CloseForm(ClientLogicalForm? form)
+    public void CloseForm(dynamic? form)
     {
         if (form == null) return;
 
-        InvokeInteraction(new CloseFormInteraction(form));
+        var interaction = BCClientLoader.CreateInteraction("CloseFormInteraction", form);
+        InvokeInteraction(interaction);
 
-        if (OpenedForm != null && form.Name == OpenedForm.Name)
+        var currentForm = OpenedForm;
+        if (currentForm != null)
         {
-            OpenedForm = null;
-            OpenedFormName = "";
+            var formName = form.Name as string;
+            var currentFormNameValue = currentForm.Name as string;
+            if (formName == currentFormNameValue)
+            {
+                OpenedForm = null;
+                OpenedFormName = "";
+            }
         }
     }
 
-    public ClientLogicalForm[] GetAllForms()
+    public dynamic[] GetAllForms()
     {
-        return ClientSession.OpenedForms.ToArray();
+        var forms = new List<dynamic>();
+        foreach (var form in ClientSession.OpenedForms)
+        {
+            forms.Add(form);
+        }
+        return forms.ToArray();
     }
 
-    public void InvokeInteraction(ClientInteraction interaction)
+    public void InvokeInteraction(dynamic interaction)
     {
         ClientSession.InvokeInteractionAsync(interaction);
-        AwaitState(ClientSessionState.Ready);
+        AwaitState(_stateReady!);
     }
 
-    public ClientLogicalForm? InvokeInteractionAndCatchForm(ClientInteraction interaction)
+    public dynamic? InvokeInteractionAndCatchForm(dynamic interaction)
     {
         _caughtForm = null;
-        ClientSession.FormToShow += OnFormToShow;
+        object session = ClientSession;
+        var handler = SubscribeToEvent(session, "FormToShow", OnFormToShow);
 
         try
         {
@@ -240,7 +287,7 @@ public class ClientContext : IDisposable
         }
         finally
         {
-            ClientSession.FormToShow -= OnFormToShow;
+            UnsubscribeFromEvent(session, "FormToShow", handler);
         }
 
         var form = _caughtForm;
@@ -280,30 +327,47 @@ public class ClientContext : IDisposable
         }
     }
 
-    public ClientLogicalControl GetControlByName(ClientLogicalControl control, string name)
+    public dynamic GetControlByName(dynamic control, string name)
     {
-        return control.ContainedControls.First(c => c.Name == name);
+        foreach (var c in control.ContainedControls)
+        {
+            if (c.Name == name) return c;
+        }
+        throw new Exception($"Control '{name}' not found");
     }
 
-    public static ClientLogicalControl? GetControlByCaption(ClientLogicalControl control, string caption)
+    public static dynamic? GetControlByCaption(dynamic control, string caption)
     {
-        return control.ContainedControls.FirstOrDefault(c => c.Caption?.Replace("&", "") == caption);
+        foreach (var c in control.ContainedControls)
+        {
+            var controlCaption = (string?)c.Caption;
+            if (controlCaption?.Replace("&", "") == caption)
+                return c;
+        }
+        return null;
     }
 
-    public void SaveValue(ClientLogicalControl control, string newValue)
+    public void SaveValue(dynamic control, string newValue)
     {
-        InvokeInteraction(new SaveValueInteraction(control, newValue));
+        var interaction = BCClientLoader.CreateInteraction("SaveValueInteraction", control, newValue);
+        InvokeInteraction(interaction);
     }
 
-    public ClientActionControl GetActionByName(ClientLogicalControl control, string name)
+    public dynamic GetActionByName(dynamic control, string name)
     {
-        return (ClientActionControl)control.ContainedControls
-            .First(c => c is ClientActionControl && c.Name == name);
+        foreach (var c in control.ContainedControls)
+        {
+            var typeName = c.GetType().Name;
+            if (typeName == "ClientActionControl" && c.Name == name)
+                return c;
+        }
+        throw new Exception($"Action '{name}' not found");
     }
 
-    public void InvokeAction(ClientActionControl action)
+    public void InvokeAction(dynamic action)
     {
-        InvokeInteraction(new InvokeActionInteraction(action));
+        var interaction = BCClientLoader.CreateInteraction("InvokeActionInteraction", action);
+        InvokeInteraction(interaction);
     }
 
     public string GetErrorFromErrorForm()
@@ -312,10 +376,12 @@ public class ClientContext : IDisposable
         {
             if (form.ControlIdentifier == "00000000-0000-0000-0800-0000836bd2d2")
             {
-                var errorControl = form.ContainedControls.FirstOrDefault(c => c is ClientStaticStringControl);
-                if (errorControl != null)
+                foreach (var c in form.ContainedControls)
                 {
-                    return ((ClientStaticStringControl)errorControl).StringValue;
+                    if (c.GetType().Name == "ClientStaticStringControl")
+                    {
+                        return c.StringValue;
+                    }
                 }
             }
         }
@@ -323,55 +389,60 @@ public class ClientContext : IDisposable
     }
 
     // Event handlers
-    private void OnFormToShow(object? sender, ClientFormToShowEventArgs e)
+    private void OnFormToShow(object? sender, dynamic e)
     {
         _caughtForm = e.FormToShow;
     }
 
-    private void OnDialogToShow(object? sender, ClientDialogToShowEventArgs e)
+    private void OnDialogToShow(object? sender, dynamic e)
     {
         var form = e.DialogToShow;
         if (form.ControlIdentifier == "00000000-0000-0000-0800-0000836bd2d2")
         {
-            var errorControl = form.ContainedControls.FirstOrDefault(c => c is ClientStaticStringControl);
-            if (errorControl != null)
+            foreach (var c in form.ContainedControls)
             {
-                HandleError($"ERROR: {((ClientStaticStringControl)errorControl).StringValue}");
+                if (c.GetType().Name == "ClientStaticStringControl")
+                {
+                    HandleError($"ERROR: {c.StringValue}");
+                    break;
+                }
             }
         }
         else if (form.ControlIdentifier == "00000000-0000-0000-0300-0000836bd2d2")
         {
-            var warningControl = form.ContainedControls.FirstOrDefault(c => c is ClientStaticStringControl);
-            if (warningControl != null)
+            foreach (var c in form.ContainedControls)
             {
-                Console.Error.WriteLine($"WARNING: {((ClientStaticStringControl)warningControl).StringValue}");
+                if (c.GetType().Name == "ClientStaticStringControl")
+                {
+                    Console.Error.WriteLine($"WARNING: {c.StringValue}");
+                    break;
+                }
             }
         }
     }
 
-    private void OnUriToShow(object? sender, ClientUriToShowEventArgs e)
+    private void OnUriToShow(object? sender, dynamic e)
     {
         // Ignore URI events
     }
 
-    private void OnInvalidCredentialsError(object? sender, MessageToShowEventArgs e)
+    private void OnInvalidCredentialsError(object? sender, dynamic e)
     {
         HandleError("Invalid credentials");
     }
 
-    private void OnUnhandledException(object? sender, ExceptionEventArgs e)
+    private void OnUnhandledException(object? sender, dynamic e)
     {
         HandleError($"Unhandled exception: {e.Exception}");
     }
 
-    private void OnCommunicationError(object? sender, ExceptionEventArgs e)
+    private void OnCommunicationError(object? sender, dynamic e)
     {
         HandleError($"Communication error: {e.Exception}");
     }
 
-    private void OnMessageToShow(object? sender, MessageToShowEventArgs e)
+    private void OnMessageToShow(object? sender, dynamic e)
     {
-        // Log messages to stderr for debugging
         Console.Error.WriteLine($"BC Message: {e.Message}");
     }
 
@@ -387,6 +458,126 @@ public class ClientContext : IDisposable
     private static bool HasProperty(object obj, string propertyName)
     {
         return obj?.GetType().GetProperty(propertyName) != null;
+    }
+
+    /// <summary>
+    /// Creates a JsonHttpClient instance using reflection to handle different constructor signatures
+    /// across BC versions. This allows the code to work with both older (3-param) and newer (4+ param)
+    /// versions of the BC client DLL.
+    /// </summary>
+    private static object CreateJsonHttpClient(Type jsonClientType, Uri addressUri, ICredentials credential, object authScheme)
+    {
+        // Get all public constructors
+        var constructors = jsonClientType.GetConstructors();
+
+        // Find constructors that start with (Uri, ICredentials, AuthenticationScheme, ...)
+        foreach (var ctor in constructors.OrderByDescending(c => c.GetParameters().Length))
+        {
+            var parameters = ctor.GetParameters();
+            if (parameters.Length < 3) continue;
+
+            // Check if first 3 params match our expected types
+            if (!parameters[0].ParameterType.IsAssignableFrom(typeof(Uri))) continue;
+            if (!parameters[1].ParameterType.IsAssignableFrom(typeof(ICredentials))) continue;
+            if (!parameters[2].ParameterType.IsEnum) continue; // AuthenticationScheme is an enum
+
+            // Build arguments array with defaults for additional parameters
+            var args = new object?[parameters.Length];
+            args[0] = addressUri;
+            args[1] = credential;
+            args[2] = authScheme;
+
+            // Fill in sensible defaults for any additional parameters
+            for (int i = 3; i < parameters.Length; i++)
+            {
+                var paramType = parameters[i].ParameterType;
+                var paramName = parameters[i].Name?.ToLowerInvariant() ?? "";
+
+                // Known parameters with their preferred defaults
+                if (paramType == typeof(bool))
+                {
+                    // antiSSRFDisabled, etc. - default to true for client tools
+                    args[i] = true;
+                }
+                else if (paramType == typeof(string))
+                {
+                    args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : "";
+                }
+                else if (paramType == typeof(int))
+                {
+                    args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : 0;
+                }
+                else if (paramType.IsClass)
+                {
+                    args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : null;
+                }
+                else
+                {
+                    // For other types, try to use default value or type default
+                    args[i] = parameters[i].HasDefaultValue
+                        ? parameters[i].DefaultValue
+                        : (paramType.IsValueType ? Activator.CreateInstance(paramType) : null);
+                }
+            }
+
+            try
+            {
+                return ctor.Invoke(args) ?? throw new InvalidOperationException("Constructor returned null");
+            }
+            catch (TargetInvocationException ex)
+            {
+                // If this constructor fails, try the next one
+                Console.Error.WriteLine($"Constructor with {parameters.Length} params failed: {ex.InnerException?.Message}");
+                continue;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"No compatible JsonHttpClient constructor found. Available constructors: " +
+            string.Join(", ", constructors.Select(c =>
+                $"({string.Join(", ", c.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"))})")));
+    }
+
+    /// <summary>
+    /// Subscribes to an event on a dynamic object using reflection.
+    /// Returns the delegate that was subscribed so it can be unsubscribed later.
+    /// </summary>
+    private static Delegate SubscribeToEvent(object target, string eventName, Action<object?, dynamic> handler)
+    {
+        var targetType = target.GetType();
+        var eventInfo = targetType.GetEvent(eventName)
+            ?? throw new InvalidOperationException($"Event {eventName} not found on type {targetType.Name}");
+
+        // Create a delegate of the correct type for this event
+        var eventHandlerType = eventInfo.EventHandlerType!;
+        var invokeMethod = eventHandlerType.GetMethod("Invoke")!;
+        var eventArgsType = invokeMethod.GetParameters()[1].ParameterType;
+
+        // Create a method that matches the event signature and invokes our handler
+        var methodInfo = typeof(ClientContext).GetMethod(nameof(CreateEventHandler), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(eventArgsType);
+
+        var typedDelegate = (Delegate)methodInfo.Invoke(null, new object[] { handler })!;
+        eventInfo.AddEventHandler(target, typedDelegate);
+
+        return typedDelegate;
+    }
+
+    /// <summary>
+    /// Unsubscribes from an event using the delegate returned from SubscribeToEvent.
+    /// </summary>
+    private static void UnsubscribeFromEvent(object target, string eventName, Delegate handler)
+    {
+        var eventInfo = target.GetType().GetEvent(eventName);
+        eventInfo?.RemoveEventHandler(target, handler);
+    }
+
+    /// <summary>
+    /// Creates a typed event handler delegate that forwards to a dynamic handler.
+    /// </summary>
+    private static EventHandler<T> CreateEventHandler<T>(Action<object?, dynamic> handler)
+    {
+        return (sender, args) => handler(sender, args!);
     }
 
     public void Dispose()

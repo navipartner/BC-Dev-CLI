@@ -1,11 +1,13 @@
 using System.CommandLine;
-using BCDev.Models;
+using BCDev.BC;
 using BCDev.Services;
 
 namespace BCDev.Commands;
 
 public static class TestCommand
 {
+    private const string DefaultBCVersion = "27.0";
+
     public static Command Create()
     {
         var command = new Command("test", "Run tests against Business Central");
@@ -50,10 +52,6 @@ public static class TestCommand
             description: "Test suite name (used internally)",
             getDefaultValue: () => "DEFAULT");
 
-        var bcClientDllPathOption = new Option<string?>(
-            name: "-bcClientDllPath",
-            description: "Path to BC client DLL (uses bundled version if not specified)");
-
         var timeoutMinutesOption = new Option<int>(
             name: "-timeoutMinutes",
             description: "Timeout in minutes for test execution",
@@ -67,7 +65,6 @@ public static class TestCommand
         command.AddOption(methodNameOption);
         command.AddOption(testAllOption);
         command.AddOption(testSuiteOption);
-        command.AddOption(bcClientDllPathOption);
         command.AddOption(timeoutMinutesOption);
 
         command.SetHandler(async (context) =>
@@ -80,14 +77,43 @@ public static class TestCommand
             var methodName = context.ParseResult.GetValueForOption(methodNameOption);
             var testAll = context.ParseResult.GetValueForOption(testAllOption);
             var testSuite = context.ParseResult.GetValueForOption(testSuiteOption)!;
-            var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
             var timeoutMinutes = context.ParseResult.GetValueForOption(timeoutMinutesOption);
 
+            // Determine BC version from app.json and set it for BCClientLoader
+            await SetBCVersionFromAppJsonAsync(launchJsonPath);
+
             await ExecuteAsync(launchJsonPath, launchJsonName, username, password,
-                codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeoutMinutes);
+                codeunitId, methodName, testAll, testSuite, timeoutMinutes);
         });
 
         return command;
+    }
+
+    /// <summary>
+    /// Determines BC version from app.json and configures BCClientLoader.
+    /// </summary>
+    private static async Task SetBCVersionFromAppJsonAsync(string launchJsonPath)
+    {
+        var artifactService = new ArtifactService();
+        string version;
+
+        // Try to find app.json in the same folder as launch.json
+        var launchDir = Path.GetDirectoryName(launchJsonPath);
+        var appJsonPath = launchDir != null ? Path.Combine(launchDir, "..", "app.json") : null;
+
+        if (appJsonPath != null && File.Exists(appJsonPath))
+        {
+            version = await artifactService.ResolveVersionFromAppJsonAsync(appJsonPath);
+        }
+        else
+        {
+            // Use default version if no app.json found
+            version = DefaultBCVersion;
+            Console.WriteLine($"No app.json found, using default BC version {version}");
+        }
+
+        // Set the version for BCClientLoader - it will download if needed
+        BCClientLoader.Version = version;
     }
 
     private static async Task ExecuteAsync(
@@ -99,13 +125,12 @@ public static class TestCommand
         string? methodName,
         bool testAll,
         string testSuite,
-        string? bcClientDllPath,
         int timeoutMinutes)
     {
         var testService = new TestService();
         var result = await testService.RunTestsAsync(
             launchJsonPath, launchJsonName, username, password,
-            codeunitId, methodName, testAll, testSuite, bcClientDllPath, timeoutMinutes);
+            codeunitId, methodName, testAll, testSuite, timeoutMinutes);
 
         Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
         {
