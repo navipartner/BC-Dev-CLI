@@ -202,14 +202,13 @@ public class PublishService
 
     private static Task<ICredentialProvider> GetCredentialProviderAsync(
         LaunchConfiguration config,
-        AuthType? authType,
         string? username,
         string? password)
     {
-        // Use explicit auth type if provided, otherwise use config
-        var effectiveAuthType = authType ?? (config.Authentication == AuthenticationMethod.UserPassword
+        // Use auth type from launch.json config
+        var effectiveAuthType = config.Authentication == AuthenticationMethod.UserPassword
             ? AuthType.UserPassword
-            : AuthType.AAD);
+            : AuthType.AAD;
 
         if (effectiveAuthType == AuthType.UserPassword)
         {
