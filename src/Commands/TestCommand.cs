@@ -132,12 +132,7 @@ public static class TestCommand
             launchJsonPath, launchJsonName, username, password,
             codeunitId, methodName, testAll, testSuite, timeoutMinutes);
 
-        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        }));
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, JsonContext.Default.TestRunResult));
 
         Environment.ExitCode = result.Success ? 0 : 1;
     }
