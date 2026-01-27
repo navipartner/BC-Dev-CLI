@@ -9,6 +9,8 @@ namespace BCDev.BC;
 /// Test runner for executing AL tests via Business Central's test tool page.
 /// Uses late binding to avoid compile-time dependency on BC client DLL.
 /// </summary>
+[RequiresUnreferencedCode("TestRunner uses BC client which requires reflection")]
+[RequiresDynamicCode("TestRunner uses BC client which requires dynamic code")]
 public class TestRunner : ClientContext
 {
     public const string AllTestsExecutedString = "All tests executed.";
