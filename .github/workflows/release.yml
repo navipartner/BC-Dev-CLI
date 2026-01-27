@@ -38,13 +38,15 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore src/bcdev.csproj
 
-      - name: Publish AOT
+      - name: Publish single-file
         shell: bash
         run: |
           dotnet publish src/bcdev.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
-            -p:PublishAot=true \
+            -p:PublishSingleFile=true \
+            -p:SelfContained=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
             -o publish
 
       - name: Prepare artifact
