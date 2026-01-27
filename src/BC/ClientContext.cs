@@ -197,11 +197,14 @@ public class ClientContext : IDisposable
 
     public dynamic OpenForm(int page)
     {
-        if (OpenedForm == null || string.IsNullOrEmpty((string)OpenedForm.Name) || OpenedForm.Name != OpenedFormName)
+        var currentForm = OpenedForm;
+        var currentFormName = currentForm?.Name as string;
+
+        if (currentForm == null || string.IsNullOrEmpty(currentFormName) || currentFormName != OpenedFormName)
         {
-            if (OpenedForm != null && OpenedForm.Name != OpenedFormName)
+            if (currentForm != null && currentFormName != OpenedFormName)
             {
-                CloseForm(OpenedForm);
+                CloseForm(currentForm);
             }
 
             var interaction = BCClientLoader.CreateInteraction("OpenFormInteraction");
@@ -215,7 +218,7 @@ public class ClientContext : IDisposable
 
             OpenedFormName = OpenedForm.Name;
         }
-        return OpenedForm;
+        return OpenedForm!;
     }
 
     public void CloseOpenedForm()
@@ -236,10 +239,16 @@ public class ClientContext : IDisposable
         var interaction = BCClientLoader.CreateInteraction("CloseFormInteraction", form);
         InvokeInteraction(interaction);
 
-        if (OpenedForm != null && form.Name == OpenedForm.Name)
+        var currentForm = OpenedForm;
+        if (currentForm != null)
         {
-            OpenedForm = null;
-            OpenedFormName = "";
+            var formName = form.Name as string;
+            var currentFormNameValue = currentForm.Name as string;
+            if (formName == currentFormNameValue)
+            {
+                OpenedForm = null;
+                OpenedFormName = "";
+            }
         }
     }
 
