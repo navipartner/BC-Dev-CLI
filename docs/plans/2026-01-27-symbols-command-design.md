@@ -2,9 +2,11 @@
 
 ## Overview
 
-Add a `bcdev symbols` command to download symbol packages from a Business Central instance for compilation.
+Add a `bcdev symbols` command to download symbol packages from a Business Central instance for compilation. Also fix AOT build warnings/errors in the release pipeline.
 
-## Command Interface
+## Part 1: Symbols Command
+
+### Command Interface
 
 ```
 bcdev symbols
@@ -26,9 +28,9 @@ bcdev symbols \
   -Password secret
 ```
 
-## Symbol Resolution
+### Symbol Resolution
 
-### Symbols downloaded (in order):
+**Symbols downloaded (in order):**
 
 1. **Platform symbols** (from app.json `platform` and `application` fields):
    - `Microsoft/Application/{application version}` 
@@ -37,77 +39,87 @@ bcdev symbols \
 
 2. **Explicit dependencies** (from app.json `dependencies[]` array)
 
-### URL format:
+**URL format:**
 ```
 GET {server}/{serverInstance}/dev/packages?publisher={publisher}&appName={name}&versionText={version}&tenant={tenant}
 GET {server}/{serverInstance}/dev/packages?publisher={publisher}&appName={name}&versionText={version}&appId={id}&tenant={tenant}
 ```
 
-### Output path logic:
+**Output path logic:**
 1. If `-packageCachePath` provided → use it
 2. Else → use `.alpackages/` next to app.json
 3. Create directory if missing
 
-### File naming:
-`{Publisher}_{Name}_{Version}.app` (matches AL extension convention)
+**File naming:** `{Publisher}_{Name}_{Version}.app`
 
-## Architecture
-
-### New files:
+### New Files
 - `src/Commands/SymbolsCommand.cs` - Command definition
 - `src/Services/SymbolService.cs` - Download logic
 
-### Modified files:
+### Modified Files
 - `src/Commands/PublishCommand.cs` - Remove legacy `-authType` parameter
 - `src/Program.cs` - Register SymbolsCommand
 
-### Authentication:
-- `UserPassword` → Basic auth via `NavUserPasswordProvider`
-- `MicrosoftEntraID` → Bearer token via `AadAuthProvider` (structured for SaaS, focus on on-prem)
+### Output Format
 
-### HTTP approach:
-- Use `HttpClient` directly (not BC client DLL)
-- Reuse `SslVerification.Disable()` for dev environments
-
-## Output Format
-
-### Success:
 ```json
 {
   "success": true,
   "outputPath": "/path/to/.alpackages",
-  "downloadedSymbols": [
-    "Microsoft_Application_27.0.0.0.app",
-    "Microsoft_System_27.0.0.0.app",
-    "Microsoft_Base Application_27.0.0.0.app"
-  ],
+  "downloadedSymbols": ["Microsoft_Application_27.0.0.0.app", ...],
   "failures": []
 }
 ```
 
-### Partial failure:
-```json
-{
-  "success": false,
-  "outputPath": "/path/to/.alpackages",
-  "downloadedSymbols": ["Microsoft_Application_27.0.0.0.app"],
-  "failures": [
-    {
-      "symbol": "Microsoft_System_27.0.0.0",
-      "error": "HTTP 404 - Package not found"
-    }
-  ]
-}
+Exit code: 0 = success, 1 = failure
+
+---
+
+## Part 2: Fix AOT Build Warnings/Errors
+
+### Critical Error Fix
+**Problem:** `PublishAot and PublishSingleFile cannot be specified at the same time`
+- Release workflow uses `-p:PublishAot=true`
+- csproj has `<PublishSingleFile>true</PublishSingleFile>`
+
+**Fix:** Remove `PublishSingleFile` and related properties from bcdev.csproj (AOT is preferred for releases)
+
+### JSON Source Generation for AOT
+**Problem:** JSON serialization/deserialization causes IL3050/IL2026 warnings
+
+**Fix:** Create `JsonContext.cs` with source-generated serializers:
+```csharp
+[JsonSerializable(typeof(LaunchConfigurations))]
+[JsonSerializable(typeof(AppJson))]
+[JsonSerializable(typeof(CompileResult))]
+[JsonSerializable(typeof(PublishResult))]
+[JsonSerializable(typeof(TestResult))]
+[JsonSerializable(typeof(SymbolsResult))]  // New
+internal partial class JsonContext : JsonSerializerContext { }
 ```
 
-### Exit codes:
-- `0` - All symbols downloaded
-- `1` - One or more failures
+Update all `JsonSerializer.Serialize/Deserialize` calls to use the generated context.
 
-## Error Handling
+### Dynamic Type Warnings Suppression
+**Problem:** BC client late-binding uses `dynamic` types (unavoidable for reflection-based DLL loading)
 
-- Invalid app.json / launch.json paths
-- Missing configuration name
-- Authentication failure (401/403)
-- Package not found (404)
-- Network/connection errors
+**Fix:** Add `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]` attributes to:
+- `BCClientLoader` class methods
+- `ClientContext` constructor and methods
+- `TestRunner` methods that use dynamic types
+
+This suppresses warnings while documenting the intentional use of reflection.
+
+### Files to Modify
+- `src/bcdev.csproj` - Remove PublishSingleFile settings
+- `src/JsonContext.cs` - New file with source-generated JSON context
+- `src/Services/LaunchConfigService.cs` - Use JsonContext
+- `src/Services/CompilerService.cs` - Use JsonContext
+- `src/Services/ArtifactService.cs` - Use JsonContext
+- `src/Formatters/JsonResultFormatter.cs` - Use JsonContext
+- `src/Commands/CompileCommand.cs` - Use JsonContext
+- `src/Commands/PublishCommand.cs` - Use JsonContext, remove -authType
+- `src/Commands/TestCommand.cs` - Use JsonContext
+- `src/BC/BCClientLoader.cs` - Add suppression attributes
+- `src/BC/ClientContext.cs` - Add suppression attributes
+- `src/BC/TestRunner.cs` - Use JsonContext, add suppression attributes
