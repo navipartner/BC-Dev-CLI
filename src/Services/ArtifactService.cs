@@ -144,10 +144,8 @@ public class ArtifactService
         try
         {
             var response = await _httpClient.GetStringAsync(indexUrl);
-            _versionCache = JsonSerializer.Deserialize<List<VersionInfo>>(response, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            }) ?? new List<VersionInfo>();
+            _versionCache = JsonSerializer.Deserialize(response, JsonContext.Default.ListVersionInfo)
+                ?? new List<VersionInfo>();
             
             return _versionCache;
         }
