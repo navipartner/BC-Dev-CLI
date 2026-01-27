@@ -35,7 +35,6 @@ public class PublishService
         string? packageCachePath,
         string launchJsonPath,
         string launchJsonName,
-        AuthType? authType,
         string? username,
         string? password,
         string? bcClientDllPath)
@@ -77,7 +76,7 @@ public class PublishService
             var config = launchConfigService.GetConfiguration(launchJsonPath, launchJsonName);
 
             // Get credentials
-            var credentialProvider = await GetCredentialProviderAsync(config, authType, username, password);
+            var credentialProvider = await GetCredentialProviderAsync(config, username, password);
             var credentials = await credentialProvider.GetCredentialsAsync();
 
             // Disable SSL verification for dev environments
@@ -203,14 +202,13 @@ public class PublishService
 
     private static Task<ICredentialProvider> GetCredentialProviderAsync(
         LaunchConfiguration config,
-        AuthType? authType,
         string? username,
         string? password)
     {
-        // Use explicit auth type if provided, otherwise use config
-        var effectiveAuthType = authType ?? (config.Authentication == AuthenticationMethod.UserPassword
+        // Use auth type from launch.json config
+        var effectiveAuthType = config.Authentication == AuthenticationMethod.UserPassword
             ? AuthType.UserPassword
-            : AuthType.AAD);
+            : AuthType.AAD;
 
         if (effectiveAuthType == AuthType.UserPassword)
         {

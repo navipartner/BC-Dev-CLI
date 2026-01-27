@@ -1,13 +1,27 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace BCDev.BC;
 
+// Static options for JSON deserialization - configured once for efficiency
+file static class TestRunnerJsonOptions
+{
+    public static readonly JsonSerializerOptions Options = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString,
+        TypeInfoResolver = JsonContext.Default
+    };
+}
+
 /// <summary>
 /// Test runner for executing AL tests via Business Central's test tool page.
 /// Uses late binding to avoid compile-time dependency on BC client DLL.
 /// </summary>
+[RequiresUnreferencedCode("TestRunner uses BC client which requires reflection")]
+[RequiresDynamicCode("TestRunner uses BC client which requires dynamic code")]
 public class TestRunner : ClientContext
 {
     public const string AllTestsExecutedString = "All tests executed.";
@@ -97,11 +111,7 @@ public class TestRunner : ClientContext
             return null;
         }
 
-        return JsonSerializer.Deserialize<TestRunnerResult>(resultString, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString
-        });
+        return JsonSerializer.Deserialize<TestRunnerResult>(resultString, TestRunnerJsonOptions.Options);
     }
 
     /// <summary>

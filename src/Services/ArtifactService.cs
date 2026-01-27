@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BCDev.Models;
 
 namespace BCDev.Services;
@@ -117,10 +118,8 @@ public class ArtifactService
         }
 
         var json = await File.ReadAllTextAsync(appJsonPath);
-        var appJson = JsonSerializer.Deserialize<AppJson>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? throw new InvalidOperationException("Failed to parse app.json");
+        var appJson = JsonSerializer.Deserialize(json, JsonContext.Default.AppJson)
+            ?? throw new InvalidOperationException("Failed to parse app.json");
 
         if (string.IsNullOrEmpty(appJson.Platform))
         {
@@ -146,10 +145,8 @@ public class ArtifactService
         try
         {
             var response = await _httpClient.GetStringAsync(indexUrl);
-            _versionCache = JsonSerializer.Deserialize<List<VersionInfo>>(response, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            }) ?? new List<VersionInfo>();
+            _versionCache = JsonSerializer.Deserialize(response, JsonContext.Default.ListVersionInfo)
+                ?? new List<VersionInfo>();
             
             return _versionCache;
         }
@@ -165,7 +162,7 @@ public class ArtifactService
     public async Task<string?> FindBestVersionAsync(string majorMinorVersion, string artifactType = DefaultArtifactType)
     {
         var versions = await FetchAvailableVersionsAsync(artifactType);
-        
+
         // Filter to matching major.minor versions
         var matching = versions
             .Where(v => v.Version.StartsWith(majorMinorVersion + "."))
@@ -705,10 +702,15 @@ public class ArtifactService
 }
 
 /// <summary>
-/// Version info from Microsoft's artifact index
+/// Version info from Microsoft's artifact index.
+/// Note: Explicit JsonPropertyName attributes required because Microsoft's CDN
+/// uses PascalCase, but our JsonContext uses camelCase naming policy.
 /// </summary>
 public class VersionInfo
 {
+    [JsonPropertyName("Version")]
     public string Version { get; set; } = string.Empty;
+
+    [JsonPropertyName("CreationTime")]
     public DateTime CreationTime { get; set; }
 }

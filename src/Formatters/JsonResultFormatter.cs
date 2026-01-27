@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace BCDev.Formatters;
 
@@ -8,27 +9,20 @@ namespace BCDev.Formatters;
 /// </summary>
 public static class JsonResultFormatter
 {
-    private static readonly JsonSerializerOptions DefaultOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     /// <summary>
-    /// Format an object as JSON for output
+    /// Format an object as JSON for output using source-generated context
     /// </summary>
-    public static string Format<T>(T obj)
+    public static string Format<T>(T obj, JsonTypeInfo<T> typeInfo)
     {
-        return JsonSerializer.Serialize(obj, DefaultOptions);
+        return JsonSerializer.Serialize(obj, typeInfo);
     }
 
     /// <summary>
-    /// Format and write to stdout
+    /// Format and write to stdout using source-generated context
     /// </summary>
-    public static void WriteToConsole<T>(T obj)
+    public static void WriteToConsole<T>(T obj, JsonTypeInfo<T> typeInfo)
     {
-        Console.WriteLine(Format(obj));
+        Console.WriteLine(Format(obj, typeInfo));
     }
 
     /// <summary>
@@ -42,21 +36,20 @@ public static class JsonResultFormatter
             Error = message,
             Details = details
         };
-        return Format(error);
+        return JsonSerializer.Serialize(error, JsonContext.Default.ErrorResponse);
     }
 
     /// <summary>
     /// Create a standardized success response
     /// </summary>
-    public static string FormatSuccess(string message, object? data = null)
+    public static string FormatSuccess(string message)
     {
         var response = new SuccessResponse
         {
             Success = true,
-            Message = message,
-            Data = data
+            Message = message
         };
-        return Format(response);
+        return JsonSerializer.Serialize(response, JsonContext.Default.SuccessResponse);
     }
 }
 
@@ -77,5 +70,4 @@ public class SuccessResponse
 {
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
-    public object? Data { get; set; }
 }

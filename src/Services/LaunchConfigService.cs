@@ -19,14 +19,8 @@ public class LaunchConfigService
         }
 
         var json = File.ReadAllText(launchJsonPath);
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            AllowTrailingCommas = true
-        };
 
-        var configs = JsonSerializer.Deserialize<LaunchConfigurations>(json, options);
+        var configs = JsonSerializer.Deserialize(json, JsonContext.Default.LaunchConfigurations);
         if (configs == null)
         {
             throw new InvalidOperationException($"Failed to parse launch.json: {launchJsonPath}");

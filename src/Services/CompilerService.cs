@@ -64,10 +64,8 @@ public class CompilerService
         try
         {
             var json = await File.ReadAllTextAsync(appJsonPath);
-            appJson = JsonSerializer.Deserialize<AppJson>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            }) ?? throw new InvalidOperationException("Failed to parse app.json");
+            appJson = JsonSerializer.Deserialize(json, JsonContext.Default.AppJson)
+                ?? throw new InvalidOperationException("Failed to parse app.json");
         }
         catch (Exception ex)
         {

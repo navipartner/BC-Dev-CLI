@@ -1,5 +1,4 @@
 using System.CommandLine;
-using BCDev.Models;
 using BCDev.Services;
 
 namespace BCDev.Commands;
@@ -48,10 +47,6 @@ public static class PublishCommand
         };
 
         // Auth options
-        var authTypeOption = new Option<AuthType?>(
-            name: "-authType",
-            description: "Authentication type (UserPassword, AAD)");
-
         var usernameOption = new Option<string?>(
             name: "-Username",
             description: "Username for UserPassword authentication");
@@ -71,7 +66,6 @@ public static class PublishCommand
         command.AddOption(packageCachePathOption);
         command.AddOption(launchJsonPathOption);
         command.AddOption(launchJsonNameOption);
-        command.AddOption(authTypeOption);
         command.AddOption(usernameOption);
         command.AddOption(passwordOption);
         command.AddOption(bcClientDllPathOption);
@@ -85,13 +79,12 @@ public static class PublishCommand
             var packageCachePath = context.ParseResult.GetValueForOption(packageCachePathOption);
             var launchJsonPath = context.ParseResult.GetValueForOption(launchJsonPathOption)!;
             var launchJsonName = context.ParseResult.GetValueForOption(launchJsonNameOption)!;
-            var authType = context.ParseResult.GetValueForOption(authTypeOption);
             var username = context.ParseResult.GetValueForOption(usernameOption);
             var password = context.ParseResult.GetValueForOption(passwordOption);
             var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
 
             await ExecuteAsync(recompile, appPath, appJsonPath, compilerPath, packageCachePath,
-                launchJsonPath, launchJsonName, authType, username, password, bcClientDllPath);
+                launchJsonPath, launchJsonName, username, password, bcClientDllPath);
         });
 
         return command;
@@ -105,7 +98,6 @@ public static class PublishCommand
         string? packageCachePath,
         string launchJsonPath,
         string launchJsonName,
-        AuthType? authType,
         string? username,
         string? password,
         string? bcClientDllPath)
@@ -139,13 +131,9 @@ public static class PublishCommand
         var publishService = new PublishService();
         var result = await publishService.PublishAsync(
             recompile, appPath, appJsonPath, compilerPath, packageCachePath,
-            launchJsonPath, launchJsonName, authType, username, password, bcClientDllPath);
+            launchJsonPath, launchJsonName, username, password, bcClientDllPath);
 
-        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-        }));
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, JsonContext.Default.PublishResult));
 
         Environment.ExitCode = result.Success ? 0 : 1;
     }

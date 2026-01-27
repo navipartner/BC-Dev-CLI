@@ -18,6 +18,9 @@ public class Program
         // Add test command
         rootCommand.AddCommand(TestCommand.Create());
 
+        // Add symbols command
+        rootCommand.AddCommand(SymbolsCommand.Create());
+
         return await rootCommand.InvokeAsync(args);
     }
 }

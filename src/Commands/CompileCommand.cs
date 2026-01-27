@@ -50,11 +50,7 @@ public static class CompileCommand
         var result = await compilerService.CompileAsync(appJsonPath, compilerPath, packageCachePath, suppressWarnings);
 
         // Output result as JSON
-        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-        }));
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, JsonContext.Default.CompileResult));
 
         Environment.ExitCode = result.Success ? 0 : 1;
     }

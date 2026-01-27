@@ -133,7 +133,7 @@ public class LaunchConfiguration
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<AuthenticationMethod>))]
 public enum AuthenticationMethod
 {
     UserPassword,
@@ -142,7 +142,7 @@ public enum AuthenticationMethod
     Windows
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<StartupObjectType>))]
 public enum StartupObjectType
 {
     Page,
@@ -151,7 +151,7 @@ public enum StartupObjectType
     Query
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<SchemaUpdateMode>))]
 public enum SchemaUpdateMode
 {
     Synchronize,
@@ -159,7 +159,7 @@ public enum SchemaUpdateMode
     ForceSync
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<BreakOnErrorOption>))]
 public enum BreakOnErrorOption
 {
     None,

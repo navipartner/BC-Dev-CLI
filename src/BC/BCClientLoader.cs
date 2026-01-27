@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using BCDev.Services;
 
@@ -7,6 +8,8 @@ namespace BCDev.BC;
 /// Dynamically loads the BC client assembly at runtime.
 /// Downloads from Microsoft if not in cache.
 /// </summary>
+[RequiresUnreferencedCode("BC client loading uses reflection for late binding")]
+[RequiresDynamicCode("BC client loading uses dynamic code generation")]
 public static class BCClientLoader
 {
     private static Assembly? _clientAssembly;
