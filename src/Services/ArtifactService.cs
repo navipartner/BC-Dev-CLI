@@ -629,6 +629,79 @@ public class ArtifactService
         public uint UncompressedSize { get; set; }
         public uint LocalHeaderOffset { get; set; }
     }
+
+    /// <summary>
+    /// Detects the actual BC version running on a server by querying the dev/packages endpoint.
+    /// Returns major.minor format (e.g., "27.3").
+    /// </summary>
+    public async Task<string?> DetectServerVersionAsync(string serverUrl, System.Net.ICredentials credentials)
+    {
+        try
+        {
+            // Parse service URL to extract base URL and tenant
+            // Input format: https://host:port/instance?tenant=xxx
+            var uri = new Uri(serverUrl);
+            var host = uri.GetLeftPart(UriPartial.Authority); // https://host:port
+            var instance = uri.AbsolutePath.TrimStart('/').Split('/')[0]; // instance name
+
+            // Get tenant from query string, default to "default"
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            var tenant = query["tenant"] ?? "default";
+
+            var packagesUrl = $"{host}/{instance}/dev/packages?publisher=Microsoft&appName=Application&versionText=1.0.0.0&tenant={tenant}";
+
+            using var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+            };
+            using var client = new HttpClient(handler);
+
+            // Add explicit Basic auth header if we have NetworkCredential
+            if (credentials is System.Net.NetworkCredential netCred)
+            {
+                var authString = $"{netCred.UserName}:{netCred.Password}";
+                var authBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(authString));
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authBase64);
+            }
+
+            // Use Range request to minimize download
+            using var request = new HttpRequestMessage(HttpMethod.Get, packagesUrl);
+            request.Headers.Range = new RangeHeaderValue(0, 0);
+
+            var response = await client.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            // Parse Content-Disposition header for filename
+            // Format: attachment; filename=Microsoft_Application_27.3.44313.44821.app
+            var contentDisposition = response.Content.Headers.ContentDisposition;
+            var filename = contentDisposition?.FileName?.Trim('"')
+                ?? contentDisposition?.FileNameStar?.Trim('"');
+
+            if (string.IsNullOrEmpty(filename))
+            {
+                return null;
+            }
+
+            // Extract version from filename: Microsoft_Application_27.3.44313.44821.app
+            // We want "27.3"
+            var parts = filename.Split('_');
+            if (parts.Length >= 3)
+            {
+                var versionPart = parts[2]; // "27.3.44313.44821.app"
+                var versionSegments = versionPart.Split('.');
+                if (versionSegments.Length >= 2)
+                {
+                    return $"{versionSegments[0]}.{versionSegments[1]}";
+                }
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 /// <summary>

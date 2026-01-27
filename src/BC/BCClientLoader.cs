@@ -148,6 +148,20 @@ public static class BCClientLoader
     /// </summary>
     public static object GetSessionState(string stateName) => GetEnumValue("ClientSessionState", stateName);
 
+    /// <summary>
+    /// Resets the loader state, allowing reinitialization with a different version.
+    /// </summary>
+    public static void Reset()
+    {
+        lock (_lock)
+        {
+            _initialized = false;
+            _clientAssembly = null;
+            _interactionsAssembly = null;
+            _currentVersion = null;
+        }
+    }
+
     private static void EnsureInitialized()
     {
         if (!_initialized)

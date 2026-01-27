@@ -66,9 +66,9 @@ public class ClientContext : IDisposable
         // Get AuthenticationScheme enum value
         var authScheme = BCClientLoader.GetEnumValue("AuthenticationScheme", authenticationScheme);
 
-        // Create JsonHttpClient
+        // Create JsonHttpClient using reflection to handle different constructor signatures
         var jsonClientType = BCClientLoader.GetClientType("JsonHttpClient");
-        dynamic jsonClient = Activator.CreateInstance(jsonClientType, addressUri, credential, authScheme)!;
+        dynamic jsonClient = CreateJsonHttpClient(jsonClientType, addressUri, credential, authScheme);
 
         // Set timeout on the HTTP client via reflection
         var httpClientField = jsonClientType.GetField("httpClient", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -118,13 +118,15 @@ public class ClientContext : IDisposable
         csParams.UICultureId = Culture;
         csParams.AdditionalSettings.Add("IncludeControlIdentifier", true);
 
-        // Subscribe to events
-        ClientSession.MessageToShow += new EventHandler<dynamic>(OnMessageToShow);
-        ClientSession.CommunicationError += new EventHandler<dynamic>(OnCommunicationError);
-        ClientSession.UnhandledException += new EventHandler<dynamic>(OnUnhandledException);
-        ClientSession.InvalidCredentialsError += new EventHandler<dynamic>(OnInvalidCredentialsError);
-        ClientSession.UriToShow += new EventHandler<dynamic>(OnUriToShow);
-        ClientSession.DialogToShow += new EventHandler<dynamic>(OnDialogToShow);
+        // Subscribe to events using reflection (required for late binding)
+        // Cast to object to avoid dynamic dispatch which doesn't allow method groups
+        object session = ClientSession;
+        SubscribeToEvent(session, "MessageToShow", OnMessageToShow);
+        SubscribeToEvent(session, "CommunicationError", OnCommunicationError);
+        SubscribeToEvent(session, "UnhandledException", OnUnhandledException);
+        SubscribeToEvent(session, "InvalidCredentialsError", OnInvalidCredentialsError);
+        SubscribeToEvent(session, "UriToShow", OnUriToShow);
+        SubscribeToEvent(session, "DialogToShow", OnDialogToShow);
 
         ClientSession.OpenSessionAsync(csParams);
         AwaitState(_stateReady!);
@@ -271,7 +273,8 @@ public class ClientContext : IDisposable
     public dynamic? InvokeInteractionAndCatchForm(dynamic interaction)
     {
         _caughtForm = null;
-        ClientSession.FormToShow += new EventHandler<dynamic>(OnFormToShow);
+        object session = ClientSession;
+        var handler = SubscribeToEvent(session, "FormToShow", OnFormToShow);
 
         try
         {
@@ -284,7 +287,7 @@ public class ClientContext : IDisposable
         }
         finally
         {
-            ClientSession.FormToShow -= new EventHandler<dynamic>(OnFormToShow);
+            UnsubscribeFromEvent(session, "FormToShow", handler);
         }
 
         var form = _caughtForm;
@@ -455,6 +458,126 @@ public class ClientContext : IDisposable
     private static bool HasProperty(object obj, string propertyName)
     {
         return obj?.GetType().GetProperty(propertyName) != null;
+    }
+
+    /// <summary>
+    /// Creates a JsonHttpClient instance using reflection to handle different constructor signatures
+    /// across BC versions. This allows the code to work with both older (3-param) and newer (4+ param)
+    /// versions of the BC client DLL.
+    /// </summary>
+    private static object CreateJsonHttpClient(Type jsonClientType, Uri addressUri, ICredentials credential, object authScheme)
+    {
+        // Get all public constructors
+        var constructors = jsonClientType.GetConstructors();
+
+        // Find constructors that start with (Uri, ICredentials, AuthenticationScheme, ...)
+        foreach (var ctor in constructors.OrderByDescending(c => c.GetParameters().Length))
+        {
+            var parameters = ctor.GetParameters();
+            if (parameters.Length < 3) continue;
+
+            // Check if first 3 params match our expected types
+            if (!parameters[0].ParameterType.IsAssignableFrom(typeof(Uri))) continue;
+            if (!parameters[1].ParameterType.IsAssignableFrom(typeof(ICredentials))) continue;
+            if (!parameters[2].ParameterType.IsEnum) continue; // AuthenticationScheme is an enum
+
+            // Build arguments array with defaults for additional parameters
+            var args = new object?[parameters.Length];
+            args[0] = addressUri;
+            args[1] = credential;
+            args[2] = authScheme;
+
+            // Fill in sensible defaults for any additional parameters
+            for (int i = 3; i < parameters.Length; i++)
+            {
+                var paramType = parameters[i].ParameterType;
+                var paramName = parameters[i].Name?.ToLowerInvariant() ?? "";
+
+                // Known parameters with their preferred defaults
+                if (paramType == typeof(bool))
+                {
+                    // antiSSRFDisabled, etc. - default to true for client tools
+                    args[i] = true;
+                }
+                else if (paramType == typeof(string))
+                {
+                    args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : "";
+                }
+                else if (paramType == typeof(int))
+                {
+                    args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : 0;
+                }
+                else if (paramType.IsClass)
+                {
+                    args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue : null;
+                }
+                else
+                {
+                    // For other types, try to use default value or type default
+                    args[i] = parameters[i].HasDefaultValue
+                        ? parameters[i].DefaultValue
+                        : (paramType.IsValueType ? Activator.CreateInstance(paramType) : null);
+                }
+            }
+
+            try
+            {
+                return ctor.Invoke(args) ?? throw new InvalidOperationException("Constructor returned null");
+            }
+            catch (TargetInvocationException ex)
+            {
+                // If this constructor fails, try the next one
+                Console.Error.WriteLine($"Constructor with {parameters.Length} params failed: {ex.InnerException?.Message}");
+                continue;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"No compatible JsonHttpClient constructor found. Available constructors: " +
+            string.Join(", ", constructors.Select(c =>
+                $"({string.Join(", ", c.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"))})")));
+    }
+
+    /// <summary>
+    /// Subscribes to an event on a dynamic object using reflection.
+    /// Returns the delegate that was subscribed so it can be unsubscribed later.
+    /// </summary>
+    private static Delegate SubscribeToEvent(object target, string eventName, Action<object?, dynamic> handler)
+    {
+        var targetType = target.GetType();
+        var eventInfo = targetType.GetEvent(eventName)
+            ?? throw new InvalidOperationException($"Event {eventName} not found on type {targetType.Name}");
+
+        // Create a delegate of the correct type for this event
+        var eventHandlerType = eventInfo.EventHandlerType!;
+        var invokeMethod = eventHandlerType.GetMethod("Invoke")!;
+        var eventArgsType = invokeMethod.GetParameters()[1].ParameterType;
+
+        // Create a method that matches the event signature and invokes our handler
+        var methodInfo = typeof(ClientContext).GetMethod(nameof(CreateEventHandler), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(eventArgsType);
+
+        var typedDelegate = (Delegate)methodInfo.Invoke(null, new object[] { handler })!;
+        eventInfo.AddEventHandler(target, typedDelegate);
+
+        return typedDelegate;
+    }
+
+    /// <summary>
+    /// Unsubscribes from an event using the delegate returned from SubscribeToEvent.
+    /// </summary>
+    private static void UnsubscribeFromEvent(object target, string eventName, Delegate handler)
+    {
+        var eventInfo = target.GetType().GetEvent(eventName);
+        eventInfo?.RemoveEventHandler(target, handler);
+    }
+
+    /// <summary>
+    /// Creates a typed event handler delegate that forwards to a dynamic handler.
+    /// </summary>
+    private static EventHandler<T> CreateEventHandler<T>(Action<object?, dynamic> handler)
+    {
+        return (sender, args) => handler(sender, args!);
     }
 
     public void Dispose()

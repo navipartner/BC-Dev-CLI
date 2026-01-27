@@ -67,10 +67,10 @@ public class TestService
             var serviceUrl = config.GetClientServicesUrl();
             var timeout = TimeSpan.FromMinutes(timeoutMinutes);
 
-            // Create test runner and run tests
+            // Create test runner with version mismatch retry
             // BCClientLoader handles downloading/loading the BC client DLL automatically
-            using var runner = new TestRunner(serviceUrl, credentialProvider.AuthenticationScheme,
-                credentials, timeout);
+            using var runner = await CreateTestRunnerWithVersionRetryAsync(
+                serviceUrl, credentialProvider.AuthenticationScheme, credentials, timeout);
 
             // Build test filters
             string? testCodeunitsRange = codeunitId?.ToString();
@@ -198,5 +198,74 @@ public class TestService
             "3" => "Skip",
             _ => "Unknown"
         };
+    }
+
+    /// <summary>
+    /// Creates a TestRunner with automatic retry on version mismatch.
+    /// If BC client version doesn't match the server, detects the actual server version
+    /// and retries with matching artifacts.
+    /// </summary>
+    private static async Task<TestRunner> CreateTestRunnerWithVersionRetryAsync(
+        string serviceUrl,
+        string authenticationScheme,
+        System.Net.ICredentials credentials,
+        TimeSpan timeout)
+    {
+        try
+        {
+            return new TestRunner(serviceUrl, authenticationScheme, credentials, timeout);
+        }
+        catch (Exception ex) when (IsVersionMismatchError(ex))
+        {
+            Console.WriteLine($"BC client version mismatch detected. Detecting server version...");
+
+            // Detect actual server version
+            var artifactService = new ArtifactService();
+            var serverVersion = await artifactService.DetectServerVersionAsync(serviceUrl, credentials);
+
+            if (string.IsNullOrEmpty(serverVersion))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to detect BC server version. Original error: {ex.Message}", ex);
+            }
+
+            Console.WriteLine($"Server is running BC {serverVersion}. Downloading matching artifacts...");
+
+            // Reset BCClientLoader and use the detected version
+            BCClientLoader.Reset();
+            BCClientLoader.Version = serverVersion;
+            await BCClientLoader.EnsureLoadedAsync();
+
+            // Retry with correct version
+            return new TestRunner(serviceUrl, authenticationScheme, credentials, timeout);
+        }
+    }
+
+    /// <summary>
+    /// Checks if an exception indicates a BC client version mismatch.
+    /// </summary>
+    private static bool IsVersionMismatchError(Exception ex)
+    {
+        var message = ex.Message;
+
+        // Constructor not found typically means version mismatch (constructor signature changed)
+        if (message.Contains("Constructor") && message.Contains("not found"))
+        {
+            return true;
+        }
+
+        // Method not found could also indicate version mismatch
+        if (message.Contains("Method") && message.Contains("not found"))
+        {
+            return true;
+        }
+
+        // Type not found in assembly
+        if (message.Contains("not found in") && message.Contains("assembly"))
+        {
+            return true;
+        }
+
+        return false;
     }
 }
