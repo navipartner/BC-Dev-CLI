@@ -1,5 +1,4 @@
 using System.CommandLine;
-using BCDev.Models;
 using BCDev.Services;
 
 namespace BCDev.Commands;
