@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BCDev.Models;
 
 namespace BCDev.Services;
@@ -161,7 +162,7 @@ public class ArtifactService
     public async Task<string?> FindBestVersionAsync(string majorMinorVersion, string artifactType = DefaultArtifactType)
     {
         var versions = await FetchAvailableVersionsAsync(artifactType);
-        
+
         // Filter to matching major.minor versions
         var matching = versions
             .Where(v => v.Version.StartsWith(majorMinorVersion + "."))
@@ -701,10 +702,15 @@ public class ArtifactService
 }
 
 /// <summary>
-/// Version info from Microsoft's artifact index
+/// Version info from Microsoft's artifact index.
+/// Note: Explicit JsonPropertyName attributes required because Microsoft's CDN
+/// uses PascalCase, but our JsonContext uses camelCase naming policy.
 /// </summary>
 public class VersionInfo
 {
+    [JsonPropertyName("Version")]
     public string Version { get; set; } = string.Empty;
+
+    [JsonPropertyName("CreationTime")]
     public DateTime CreationTime { get; set; }
 }
