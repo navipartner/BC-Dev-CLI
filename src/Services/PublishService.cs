@@ -76,7 +76,7 @@ public class PublishService
             var config = launchConfigService.GetConfiguration(launchJsonPath, launchJsonName);
 
             // Get credentials
-            var credentialProvider = await GetCredentialProviderAsync(config, authType, username, password);
+            var credentialProvider = await GetCredentialProviderAsync(config, username, password);
             var credentials = await credentialProvider.GetCredentialsAsync();
 
             // Disable SSL verification for dev environments
