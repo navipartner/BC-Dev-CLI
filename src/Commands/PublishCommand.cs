@@ -99,7 +99,6 @@ public static class PublishCommand
         string? packageCachePath,
         string launchJsonPath,
         string launchJsonName,
-        AuthType? authType,
         string? username,
         string? password,
         string? bcClientDllPath)
