@@ -48,10 +48,6 @@ public static class PublishCommand
         };
 
         // Auth options
-        var authTypeOption = new Option<AuthType?>(
-            name: "-authType",
-            description: "Authentication type (UserPassword, AAD)");
-
         var usernameOption = new Option<string?>(
             name: "-Username",
             description: "Username for UserPassword authentication");
