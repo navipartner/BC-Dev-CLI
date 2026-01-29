@@ -3,13 +3,12 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using BCDev.Auth;
-using BCDev.BC;
 using BCDev.Models;
 
 namespace BCDev.Services;
 
 /// <summary>
-/// Service for downloading symbol packages from Business Central
+/// Service for downloading symbol packages from Business Central or NuGet feeds
 /// </summary>
 public class SymbolService
 {
@@ -25,9 +24,49 @@ public class SymbolService
     }
 
     /// <summary>
-    /// Download symbols for an AL application
+    /// Download symbols from NuGet feeds (default mode)
     /// </summary>
-    public async Task<SymbolsResult> DownloadSymbolsAsync(
+    public async Task<SymbolsResult> DownloadFromNuGetAsync(
+        string appJsonPath,
+        string? packageCachePath,
+        string country = "w1")
+    {
+        var result = new SymbolsResult();
+
+        try
+        {
+            // Parse app.json
+            var appJsonContent = await File.ReadAllTextAsync(appJsonPath);
+            var appJson = JsonSerializer.Deserialize(appJsonContent, JsonContext.Default.AppJson);
+            if (appJson == null)
+            {
+                throw new InvalidOperationException($"Failed to parse app.json: {appJsonPath}");
+            }
+
+            // Determine output path
+            var appDir = Path.GetDirectoryName(Path.GetFullPath(appJsonPath))!;
+            var outputPath = packageCachePath ?? Path.Combine(appDir, ".alpackages");
+
+            // Use NuGet feed service
+            using var nugetService = new NuGetFeedService();
+            return await nugetService.DownloadSymbolsAsync(appJson, outputPath, country);
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Failures.Add(new SymbolFailure
+            {
+                Symbol = "initialization",
+                Error = ex.Message
+            });
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Download symbols from Business Central server (legacy mode with -fromServer flag)
+    /// </summary>
+    public async Task<SymbolsResult> DownloadFromServerAsync(
         string appJsonPath,
         string launchJsonPath,
         string launchJsonName,
@@ -50,7 +89,7 @@ public class SymbolService
             // Determine output path
             var appDir = Path.GetDirectoryName(Path.GetFullPath(appJsonPath))!;
             var outputPath = packageCachePath ?? Path.Combine(appDir, ".alpackages");
-            
+
             // Create directory if it doesn't exist
             if (!Directory.Exists(outputPath))
             {
@@ -66,15 +105,12 @@ public class SymbolService
             var credentialProvider = GetCredentialProvider(config, username, password);
             var credentials = await credentialProvider.GetCredentialsAsync();
 
-            // Disable SSL verification for dev environments
-            SslVerification.Disable();
-
             // Get list of symbols to download
             var symbols = GetSymbolsToDownload(appJson);
 
             // Download each symbol
             using var httpClient = CreateHttpClient(config, credentials, credentialProvider.AuthenticationScheme);
-            
+
             foreach (var symbol in symbols)
             {
                 var fileName = GetSymbolFileName(symbol.Publisher, symbol.Name, symbol.Version);
@@ -83,12 +119,14 @@ public class SymbolService
                 try
                 {
                     var url = BuildPackageUrl(config, symbol.Publisher, symbol.Name, symbol.Version, symbol.AppId);
-                    var response = await httpClient.GetAsync(url);
+                    using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        var content = await response.Content.ReadAsByteArrayAsync();
-                        await File.WriteAllBytesAsync(filePath, content);
+                        // Stream directly to disk to avoid buffering large files in memory
+                        await using var source = await response.Content.ReadAsStreamAsync();
+                        await using var destination = File.Create(filePath);
+                        await source.CopyToAsync(destination);
                         result.DownloadedSymbols.Add(fileName);
                     }
                     else
@@ -145,7 +183,7 @@ public class SymbolService
             Version = applicationVersion
         });
 
-        // System symbol
+        // System symbol (maps to Platform package in NuGet)
         symbols.Add(new SymbolInfo
         {
             Publisher = "Microsoft",
@@ -159,7 +197,7 @@ public class SymbolService
             Publisher = "Microsoft",
             Name = "Base Application",
             Version = applicationVersion,
-            AppId = "437dbf0e-84ff-417a-965d-ed2bb9650972"
+            AppId = NuGetFeedService.BaseApplicationAppId
         });
 
         // Explicit dependencies from app.json
@@ -193,7 +231,7 @@ public class SymbolService
     }
 
     /// <summary>
-    /// Build the package download URL
+    /// Build the package download URL for BC server
     /// </summary>
     public static string BuildPackageUrl(LaunchConfiguration config, string publisher, string name, string version, string? appId)
     {

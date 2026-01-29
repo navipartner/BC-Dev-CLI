@@ -35,6 +35,7 @@ namespace BCDev;
 [JsonSerializable(typeof(SymbolsResult))]
 [JsonSerializable(typeof(SymbolFailure))]
 [JsonSerializable(typeof(List<SymbolFailure>))]
+[JsonSerializable(typeof(NuGetVersionIndex))]
 internal partial class JsonContext : JsonSerializerContext
 {
 }
