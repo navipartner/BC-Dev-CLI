@@ -80,11 +80,22 @@ Run tests against Business Central.
 
 ### `bcdev symbols`
 
-Download symbol packages from Business Central for compilation dependencies.
+Download symbol packages for compilation dependencies. By default, downloads from Microsoft's public NuGet feeds (faster, works offline/CI). Optionally download from a BC server with `-fromServer`.
 
+**NuGet mode (default):**
+```bash
+# Download symbols from NuGet feeds (no BC server required)
+bcdev symbols -appJsonPath "/path/to/app.json"
+
+# With country-specific packages (e.g., US, DE, DK)
+bcdev symbols -appJsonPath "/path/to/app.json" -country us
+```
+
+**Server mode (opt-in):**
 ```bash
 bcdev symbols \
   -appJsonPath "/path/to/app.json" \
+  -fromServer \
   -launchJsonPath "/path/to/.vscode/launch.json" \
   -launchJsonName "Your Config Name" \
   -Username "bcuser" \
@@ -94,10 +105,13 @@ bcdev symbols \
 | Option | Required | Description |
 |--------|----------|-------------|
 | `-appJsonPath` | Yes | Path to app.json file |
-| `-launchJsonPath` | Yes | Path to launch.json |
-| `-launchJsonName` | Yes | Configuration name |
 | `-packageCachePath` | No | Output folder (defaults to .alpackages next to app.json) |
-| `-Username` | No* | Username |
-| `-Password` | No* | Password |
+| `-country` | No | Country code for localized symbols (e.g., us, de, dk). Default `w1` uses country-less packages |
+| `-fromServer` | No | Download from BC server instead of NuGet feeds |
+| `-launchJsonPath` | No* | Path to launch.json |
+| `-launchJsonName` | No* | Configuration name |
+| `-Username` | No** | Username |
+| `-Password` | No** | Password |
 
-*Required for UserPassword auth
+*Required with `-fromServer`
+**Required for UserPassword auth with `-fromServer`
