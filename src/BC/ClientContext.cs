@@ -55,14 +55,6 @@ public class ClientContext : IDisposable
         _stateTimedOut ??= BCClientLoader.GetSessionState("TimedOut");
         _stateUninitialized ??= BCClientLoader.GetSessionState("Uninitialized");
 
-        // Configure keep-alive for long-running operations
-        ServicePointManager.SetTcpKeepAlive(true,
-            (int)TimeSpan.FromMinutes(120).TotalMilliseconds,
-            (int)TimeSpan.FromSeconds(10).TotalMilliseconds);
-
-        // Disable SSL verification for dev environments
-        SslVerification.Disable();
-
         var clientServicesUrl = EnsureClientServicesPath(serviceUrl);
         var addressUri = new Uri(clientServicesUrl);
 

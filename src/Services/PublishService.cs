@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using BCDev.Auth;
-using BCDev.BC;
 using BCDev.Models;
 
 namespace BCDev.Services;
@@ -78,9 +77,6 @@ public class PublishService
             // Get credentials
             var credentialProvider = await GetCredentialProviderAsync(config, username, password);
             var credentials = await credentialProvider.GetCredentialsAsync();
-
-            // Disable SSL verification for dev environments
-            SslVerification.Disable();
 
             // Build the Development Service URL
             var devServiceUrl = BuildDevServiceUrl(config);
