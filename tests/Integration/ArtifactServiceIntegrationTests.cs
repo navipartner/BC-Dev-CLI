@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using BCDev.Services;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -12,18 +13,26 @@ public class ArtifactServiceIntegrationTests
 {
     private readonly ITestOutputHelper _output;
     private readonly HttpClient _httpClient = new();
-    private const string ArtifactUrl = "https://bcartifacts-exdbf9fwegejdqak.b02.azurefd.net/sandbox/27.0.38460.41621/platform";
+    private readonly ArtifactService _artifactService = new();
 
     public ArtifactServiceIntegrationTests(ITestOutputHelper output)
     {
         _output = output;
     }
 
+    private async Task<string> GetCurrentArtifactUrlAsync()
+    {
+        var fullVersion = await _artifactService.FindBestVersionAsync("27.0");
+        return _artifactService.GetArtifactUrl(fullVersion!);
+    }
+
     [Fact]
     public async Task ServerSupportsRangeRequests()
     {
         // HEAD request to check Range support
-        var headRequest = new HttpRequestMessage(HttpMethod.Head, ArtifactUrl);
+        var artifactUrl = await GetCurrentArtifactUrlAsync();
+        _output.WriteLine($"Using artifact URL: {artifactUrl}");
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, artifactUrl);
         var response = await _httpClient.SendAsync(headRequest);
         
         _output.WriteLine($"Status: {response.StatusCode}");
@@ -39,13 +48,14 @@ public class ArtifactServiceIntegrationTests
     public async Task CanDownloadPartialContent()
     {
         // First get total size
-        var headRequest = new HttpRequestMessage(HttpMethod.Head, ArtifactUrl);
+        var artifactUrl = await GetCurrentArtifactUrlAsync();
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, artifactUrl);
         var headResponse = await _httpClient.SendAsync(headRequest);
         var totalSize = headResponse.Content.Headers.ContentLength ?? 0;
 
         // Download last 64KB using Range
         var rangeStart = totalSize - 65536;
-        var rangeRequest = new HttpRequestMessage(HttpMethod.Get, ArtifactUrl);
+        var rangeRequest = new HttpRequestMessage(HttpMethod.Get, artifactUrl);
         rangeRequest.Headers.Range = new RangeHeaderValue(rangeStart, totalSize - 1);
 
         var response = await _httpClient.SendAsync(rangeRequest);
@@ -64,13 +74,14 @@ public class ArtifactServiceIntegrationTests
     public async Task CanParseZipEndOfCentralDirectory()
     {
         // Get total size
-        var headRequest = new HttpRequestMessage(HttpMethod.Head, ArtifactUrl);
+        var artifactUrl = await GetCurrentArtifactUrlAsync();
+        var headRequest = new HttpRequestMessage(HttpMethod.Head, artifactUrl);
         var headResponse = await _httpClient.SendAsync(headRequest);
         var totalSize = headResponse.Content.Headers.ContentLength ?? 0;
 
         // Download EOCD
         var rangeStart = totalSize - 65536;
-        var rangeRequest = new HttpRequestMessage(HttpMethod.Get, ArtifactUrl);
+        var rangeRequest = new HttpRequestMessage(HttpMethod.Get, artifactUrl);
         rangeRequest.Headers.Range = new RangeHeaderValue(rangeStart, totalSize - 1);
         var response = await _httpClient.SendAsync(rangeRequest);
         var data = await response.Content.ReadAsByteArrayAsync();

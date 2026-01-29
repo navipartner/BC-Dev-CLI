@@ -18,8 +18,7 @@ bcdev test \
 
 ```bash
 bcdev compile \
-  -appJsonPath "/path/to/app.json" \
-  -compilerPath "/path/to/alc.exe"
+  -appJsonPath "/path/to/app.json"
 ```
 
 ### Publishing an App
@@ -43,7 +42,6 @@ Compile an AL application.
 | Option | Required | Description |
 |--------|----------|-------------|
 | `-appJsonPath` | Yes | Path to app.json file |
-| `-compilerPath` | Yes | Path to alc.exe compiler |
 | `-packageCachePath` | No | Path to .alpackages folder |
 
 ### `bcdev publish`
@@ -55,7 +53,6 @@ Publish an AL application to Business Central.
 | `-appPath` | Yes* | Path to .app file |
 | `-recompile` | No | Compile before publishing |
 | `-appJsonPath` | Yes** | Path to app.json (with -recompile) |
-| `-compilerPath` | Yes** | Path to alc.exe (with -recompile) |
 | `-launchJsonPath` | Yes | Path to launch.json |
 | `-launchJsonName` | Yes | Configuration name |
 | `-authType` | No | UserPassword or AAD |
@@ -80,7 +77,6 @@ Run tests against Business Central.
 | `-MethodName` | No | Specific test method name |
 | `-testSuite` | No | Test suite name (default: DEFAULT) |
 | `-timeout` | No | Timeout in minutes (default: 30) |
-| `-bcClientDllPath` | No | Custom BC client DLL path |
 
 ### `bcdev symbols`
 
