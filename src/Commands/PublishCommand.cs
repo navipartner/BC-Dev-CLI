@@ -24,10 +24,6 @@ public static class PublishCommand
             name: "-appJsonPath",
             description: "Path to app.json file (required with -recompile)");
 
-        var compilerPathOption = new Option<string?>(
-            name: "-compilerPath",
-            description: "Path to alc.exe compiler (required with -recompile)");
-
         var packageCachePathOption = new Option<string?>(
             name: "-packageCachePath",
             description: "Path to .alpackages folder containing symbol packages (used with -recompile)");
@@ -55,36 +51,28 @@ public static class PublishCommand
             name: "-Password",
             description: "Password for UserPassword authentication");
 
-        var bcClientDllPathOption = new Option<string?>(
-            name: "-bcClientDllPath",
-            description: "Path to BC client DLL (uses bundled version if not specified)");
-
         command.AddOption(recompileOption);
         command.AddOption(appPathOption);
         command.AddOption(appJsonPathOption);
-        command.AddOption(compilerPathOption);
         command.AddOption(packageCachePathOption);
         command.AddOption(launchJsonPathOption);
         command.AddOption(launchJsonNameOption);
         command.AddOption(usernameOption);
         command.AddOption(passwordOption);
-        command.AddOption(bcClientDllPathOption);
 
         command.SetHandler(async (context) =>
         {
             var recompile = context.ParseResult.GetValueForOption(recompileOption);
             var appPath = context.ParseResult.GetValueForOption(appPathOption);
             var appJsonPath = context.ParseResult.GetValueForOption(appJsonPathOption);
-            var compilerPath = context.ParseResult.GetValueForOption(compilerPathOption);
             var packageCachePath = context.ParseResult.GetValueForOption(packageCachePathOption);
             var launchJsonPath = context.ParseResult.GetValueForOption(launchJsonPathOption)!;
             var launchJsonName = context.ParseResult.GetValueForOption(launchJsonNameOption)!;
             var username = context.ParseResult.GetValueForOption(usernameOption);
             var password = context.ParseResult.GetValueForOption(passwordOption);
-            var bcClientDllPath = context.ParseResult.GetValueForOption(bcClientDllPathOption);
 
-            await ExecuteAsync(recompile, appPath, appJsonPath, compilerPath, packageCachePath,
-                launchJsonPath, launchJsonName, username, password, bcClientDllPath);
+            await ExecuteAsync(recompile, appPath, appJsonPath, packageCachePath,
+                launchJsonPath, launchJsonName, username, password);
         });
 
         return command;
@@ -94,13 +82,11 @@ public static class PublishCommand
         bool recompile,
         string? appPath,
         string? appJsonPath,
-        string? compilerPath,
         string? packageCachePath,
         string launchJsonPath,
         string launchJsonName,
         string? username,
-        string? password,
-        string? bcClientDllPath)
+        string? password)
     {
         // Validate options
         if (recompile)
@@ -108,12 +94,6 @@ public static class PublishCommand
             if (string.IsNullOrEmpty(appJsonPath))
             {
                 WriteError("Error: -appJsonPath is required when using -recompile");
-                Environment.ExitCode = 1;
-                return;
-            }
-            if (string.IsNullOrEmpty(compilerPath))
-            {
-                WriteError("Error: -compilerPath is required when using -recompile");
                 Environment.ExitCode = 1;
                 return;
             }
@@ -130,8 +110,8 @@ public static class PublishCommand
 
         var publishService = new PublishService();
         var result = await publishService.PublishAsync(
-            recompile, appPath, appJsonPath, compilerPath, packageCachePath,
-            launchJsonPath, launchJsonName, username, password, bcClientDllPath);
+            recompile, appPath, appJsonPath, packageCachePath,
+            launchJsonPath, launchJsonName, username, password);
 
         Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, JsonContext.Default.PublishResult));
 

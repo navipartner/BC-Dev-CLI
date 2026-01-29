@@ -66,14 +66,14 @@ public class ArtifactServiceIntegrationTests
         rangeRequest.Headers.Range = new RangeHeaderValue(rangeStart, totalSize - 1);
 
         var response = await _httpClient.SendAsync(rangeRequest);
-        
+
         _output.WriteLine($"Range request status: {response.StatusCode}");
-        
+
         Assert.Equal(System.Net.HttpStatusCode.PartialContent, response.StatusCode);
 
         var data = await response.Content.ReadAsByteArrayAsync();
         _output.WriteLine($"Downloaded: {data.Length:N0} bytes");
-        
+
         Assert.Equal(65536, data.Length);
     }
 
@@ -99,7 +99,7 @@ public class ArtifactServiceIntegrationTests
         var eocdPos = -1;
         for (var i = data.Length - 22; i >= 0; i--)
         {
-            if (data[i] == eocdSig[0] && data[i + 1] == eocdSig[1] && 
+            if (data[i] == eocdSig[0] && data[i + 1] == eocdSig[1] &&
                 data[i + 2] == eocdSig[2] && data[i + 3] == eocdSig[3])
             {
                 eocdPos = i;

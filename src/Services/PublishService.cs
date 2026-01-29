@@ -30,13 +30,11 @@ public class PublishService
         bool recompile,
         string? appPath,
         string? appJsonPath,
-        string? compilerPath,
         string? packageCachePath,
         string launchJsonPath,
         string launchJsonName,
         string? username,
-        string? password,
-        string? bcClientDllPath)
+        string? password)
     {
         var result = new PublishResult();
 
@@ -45,8 +43,15 @@ public class PublishService
             // If recompile flag is set, compile first (suppress warnings for cleaner output)
             if (recompile)
             {
+                // Auto-download compiler based on app.json platform version
+                var artifactService = new ArtifactService();
+                var version = await artifactService.ResolveVersionFromAppJsonAsync(appJsonPath!);
+                await artifactService.EnsureArtifactsAsync(version);
+                var compilerPath = artifactService.GetCachedCompilerPath(version)
+                    ?? throw new InvalidOperationException($"Failed to get compiler path for version {version}");
+
                 var compilerService = new CompilerService();
-                var compileResult = await compilerService.CompileAsync(appJsonPath!, compilerPath!, packageCachePath, suppressWarnings: true);
+                var compileResult = await compilerService.CompileAsync(appJsonPath!, compilerPath, packageCachePath, suppressWarnings: true);
 
                 if (!compileResult.Success)
                 {
