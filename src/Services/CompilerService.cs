@@ -121,8 +121,18 @@ public class CompilerService
             await process.WaitForExitAsync();
 
             result.ExitCode = process.ExitCode;
-            result.StdOut = stdout;
-            result.StdErr = stderr;
+
+            // Filter warnings from raw output if suppressing
+            if (suppressWarnings)
+            {
+                result.StdOut = FilterWarningsFromOutput(stdout);
+                result.StdErr = FilterWarningsFromOutput(stderr);
+            }
+            else
+            {
+                result.StdOut = stdout;
+                result.StdErr = stderr;
+            }
 
             // Parse compiler output for errors and warnings
             ParseCompilerOutput(stdout + stderr, result, suppressWarnings);
@@ -235,5 +245,19 @@ public class CompilerService
         {
             return new CompilerError { Message = line };
         }
+    }
+
+    /// <summary>
+    /// Filter warning lines from compiler output text.
+    /// Handles both Unix (\n) and Windows (\r\n) line endings.
+    /// </summary>
+    public static string? FilterWarningsFromOutput(string? output)
+    {
+        if (string.IsNullOrEmpty(output))
+            return output;
+
+        var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var filteredLines = lines.Where(line => !line.Contains(": warning ")).ToArray();
+        return string.Join("\n", filteredLines);
     }
 }

@@ -20,6 +20,10 @@ public class ArtifactService
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromMinutes(10) };
     private List<VersionInfo>? _versionCache;
 
+    // Locks for concurrent downloads - prevents race conditions when multiple tests download same version
+    private static readonly Dictionary<string, SemaphoreSlim> _downloadLocks = new();
+    private static readonly object _lockDictionaryLock = new();
+
     /// <summary>
     /// Gets the OS-specific cache directory path
     /// </summary>
@@ -65,7 +69,8 @@ public class ArtifactService
     }
 
     /// <summary>
-    /// Checks if artifacts for a version are already cached
+    /// Checks if artifacts for a version are already cached.
+    /// Uses a completion marker to ensure extraction finished fully.
     /// </summary>
     public bool IsVersionCached(string version)
     {
@@ -75,9 +80,9 @@ public class ArtifactService
             return false;
         }
 
-        // Check for required files
-        var clientDll = Path.Combine(versionPath, "Microsoft.Dynamics.Framework.UI.Client.dll");
-        return File.Exists(clientDll);
+        // Check for completion marker - written as the LAST step of extraction
+        var completionMarker = Path.Combine(versionPath, ".extraction-complete");
+        return File.Exists(completionMarker);
     }
 
     /// <summary>
@@ -188,46 +193,81 @@ public class ArtifactService
     }
 
     /// <summary>
-    /// Ensures artifacts are available for the specified version, downloading if necessary
+    /// Ensures artifacts are available for the specified version, downloading if necessary.
+    /// Thread-safe for concurrent calls requesting the same version.
     /// </summary>
     public async Task<string> EnsureArtifactsAsync(string majorMinorVersion, string artifactType = DefaultArtifactType)
     {
         // Use major.minor as cache key for simplicity
         var versionPath = GetVersionCachePath(majorMinorVersion);
 
+        // Fast path: already cached
         if (IsVersionCached(majorMinorVersion))
         {
             Console.WriteLine($"Using cached BC {majorMinorVersion} artifacts");
             return versionPath;
         }
 
-        Console.WriteLine($"Resolving BC {majorMinorVersion} version...");
+        // Get or create a lock for this specific version to prevent concurrent downloads
+        SemaphoreSlim downloadLock;
+        lock (_lockDictionaryLock)
+        {
+            if (!_downloadLocks.TryGetValue(majorMinorVersion, out downloadLock!))
+            {
+                downloadLock = new SemaphoreSlim(1, 1);
+                _downloadLocks[majorMinorVersion] = downloadLock;
+            }
+        }
 
-        // Find the best matching full version
-        var fullVersion = await FindBestVersionAsync(majorMinorVersion, artifactType)
-            ?? throw new InvalidOperationException($"No BC artifacts found for version {majorMinorVersion}");
-
-        Console.WriteLine($"Found version {fullVersion}");
-        Console.WriteLine($"Downloading BC {majorMinorVersion} artifacts from Microsoft...");
-
-        // Create cache directory
-        Directory.CreateDirectory(versionPath);
-
+        await downloadLock.WaitAsync();
         try
         {
-            var artifactUrl = GetArtifactUrl(fullVersion, artifactType);
-            await DownloadAndExtractArtifactsAsync(artifactUrl, versionPath);
-            Console.WriteLine($"Cached to {versionPath}");
-            return versionPath;
-        }
-        catch
-        {
-            // Clean up on failure
-            if (Directory.Exists(versionPath))
+            // Check again after acquiring lock - another thread may have downloaded
+            if (IsVersionCached(majorMinorVersion))
             {
-                Directory.Delete(versionPath, true);
+                Console.WriteLine($"Using cached BC {majorMinorVersion} artifacts");
+                return versionPath;
             }
-            throw;
+
+            Console.WriteLine($"Resolving BC {majorMinorVersion} version...");
+
+            // Find the best matching full version
+            var fullVersion = await FindBestVersionAsync(majorMinorVersion, artifactType)
+                ?? throw new InvalidOperationException($"No BC artifacts found for version {majorMinorVersion}");
+
+            Console.WriteLine($"Found version {fullVersion}");
+            Console.WriteLine($"Downloading BC {majorMinorVersion} artifacts from Microsoft...");
+
+            // Create cache directory
+            Directory.CreateDirectory(versionPath);
+
+            try
+            {
+                var artifactUrl = GetArtifactUrl(fullVersion, artifactType);
+                await DownloadAndExtractArtifactsAsync(artifactUrl, versionPath);
+                Console.WriteLine($"Cached to {versionPath}");
+                return versionPath;
+            }
+            catch
+            {
+                // Clean up on failure - only this thread should be writing
+                if (Directory.Exists(versionPath))
+                {
+                    try
+                    {
+                        Directory.Delete(versionPath, true);
+                    }
+                    catch
+                    {
+                        // Ignore cleanup errors
+                    }
+                }
+                throw;
+            }
+        }
+        finally
+        {
+            downloadLock.Release();
         }
     }
 
@@ -314,6 +354,10 @@ public class ArtifactService
         }
 
         Console.WriteLine($"Extracted: {string.Join(", ", extractedFiles.Where(f => !f.EndsWith(".vsix")))}");
+
+        // Write completion marker as the LAST step - signals extraction is fully complete
+        var completionMarker = Path.Combine(targetPath, ".extraction-complete");
+        await File.WriteAllTextAsync(completionMarker, DateTime.UtcNow.ToString("O"));
     }
 
     private async Task<byte[]> DownloadRangeAsync(string url, long start, long end)

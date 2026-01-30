@@ -1,7 +1,7 @@
 # bcdev
 
-Build and test with .NET 8:
+Build and test with .NET 10:
 ```bash
-/opt/homebrew/opt/dotnet@8/bin/dotnet build
-/opt/homebrew/opt/dotnet@8/bin/dotnet test
+dotnet build
+dotnet test
 ```
