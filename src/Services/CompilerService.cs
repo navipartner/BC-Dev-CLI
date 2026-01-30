@@ -236,4 +236,18 @@ public class CompilerService
             return new CompilerError { Message = line };
         }
     }
+
+    /// <summary>
+    /// Filter warning lines from compiler output text.
+    /// Handles both Unix (\n) and Windows (\r\n) line endings.
+    /// </summary>
+    public static string? FilterWarningsFromOutput(string? output)
+    {
+        if (string.IsNullOrEmpty(output))
+            return output;
+
+        var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var filteredLines = lines.Where(line => !line.Contains(": warning ")).ToArray();
+        return string.Join("\n", filteredLines);
+    }
 }
