@@ -121,8 +121,18 @@ public class CompilerService
             await process.WaitForExitAsync();
 
             result.ExitCode = process.ExitCode;
-            result.StdOut = stdout;
-            result.StdErr = stderr;
+
+            // Filter warnings from raw output if suppressing
+            if (suppressWarnings)
+            {
+                result.StdOut = FilterWarningsFromOutput(stdout);
+                result.StdErr = FilterWarningsFromOutput(stderr);
+            }
+            else
+            {
+                result.StdOut = stdout;
+                result.StdErr = stderr;
+            }
 
             // Parse compiler output for errors and warnings
             ParseCompilerOutput(stdout + stderr, result, suppressWarnings);
