@@ -230,13 +230,14 @@ public class WarningSuppressionIntegrationTests
         _output.WriteLine($"Compiler: {compilerPath}");
 
         // Verify compiler can run
-        Assert.True(CanRunCompiler(compilerPath),
-            "Compiler must be able to run. BC compiler is x64 only - on ARM64 macOS requires Rosetta + x64 .NET runtime.");
+        var (canRun, reason) = CanRunCompiler(compilerPath);
+        _output.WriteLine($"Compiler check: canRun={canRun}, reason={reason}");
+        Assert.True(canRun, $"Compiler must be runnable. Reason: {reason}");
 
         return compilerPath;
     }
 
-    private bool CanRunCompiler(string compilerPath)
+    private (bool canRun, string reason) CanRunCompiler(string compilerPath)
     {
         try
         {
@@ -251,16 +252,23 @@ public class WarningSuppressionIntegrationTests
             };
 
             using var process = System.Diagnostics.Process.Start(psi);
-            if (process == null) return false;
+            if (process == null) return (false, "Process.Start returned null");
 
-            var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
             process.WaitForExit(5000);
 
-            return output.Contains("AL Compiler") || output.Contains("Microsoft");
+            var output = stdout + stderr;
+            if (output.Contains("AL Compiler") || output.Contains("Microsoft"))
+            {
+                return (true, "Compiler runs successfully");
+            }
+
+            return (false, $"Unexpected output: {output.Substring(0, Math.Min(200, output.Length))}");
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            return (false, $"Exception: {ex.Message}");
         }
     }
 
