@@ -29,7 +29,7 @@ public class WarningSuppressionTests
                     "file.al(4,1): warning AL1234: Yet another warning";
 
         var filtered = CompilerService.FilterWarningsFromOutput(input);
-        var lines = filtered.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lines = filtered!.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
         Assert.Single(lines);
         Assert.Contains("error AL0001", lines[0]);

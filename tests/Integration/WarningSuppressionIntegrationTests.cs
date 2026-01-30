@@ -1,77 +1,72 @@
-using System.Runtime.InteropServices;
 using BCDev.Services;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace BCDev.Tests.Integration;
 
+/// <summary>
+/// Integration tests for warning suppression functionality.
+/// Tests that -suppressWarnings properly filters warnings from output while preserving errors.
+/// </summary>
+[Trait("Category", "Slow")]
 public class WarningSuppressionIntegrationTests
 {
-    private readonly CompilerService _service;
-    private readonly string _fixturesPath;
-    private readonly string _toolsPath;
+    private readonly ITestOutputHelper _output;
+    private readonly ArtifactService _artifactService;
+    private readonly CompilerService _compilerService;
 
-    public WarningSuppressionIntegrationTests()
+    public WarningSuppressionIntegrationTests(ITestOutputHelper output)
     {
-        _service = new CompilerService();
-        _fixturesPath = Path.Combine(AppContext.BaseDirectory, "Fixtures");
-        _toolsPath = Path.Combine(AppContext.BaseDirectory, "Tools", "alc");
-    }
-
-    private string GetCompilerPath()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return Path.Combine(_toolsPath, "alc");
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return Path.Combine(_toolsPath, "alc");
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return Path.Combine(_toolsPath, "alc.exe");
-        }
-
-        throw new PlatformNotSupportedException("Unsupported platform for AL compiler");
+        _output = output;
+        _artifactService = new ArtifactService();
+        _compilerService = new CompilerService();
     }
 
     [Fact]
     public async Task CompileAsync_AppWithWarnings_SuppressWarningsFalse_ShowsWarningsInOutput()
     {
         // Arrange
-        var compilerPath = GetCompilerPath();
-        if (!File.Exists(compilerPath))
-        {
-            return; // Skip if compiler not available
-        }
+        var testAppPath = Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "AppWithWarnings");
+        var appJsonPath = Path.Combine(testAppPath, "app.json");
 
-        var testAppPath = Path.Combine(_fixturesPath, "AppWithWarnings");
-        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-test-{Guid.NewGuid()}");
-        CopyDirectory(testAppPath, tempDir);
-        var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+        Assert.True(File.Exists(appJsonPath), $"Test app.json should exist at {appJsonPath}");
+        _output.WriteLine($"Test app: {testAppPath}");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-warning-test-{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
 
         try
         {
+            CopyDirectory(testAppPath, tempDir);
+            var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+
+            // Get compiler
+            var compilerPath = await GetCompilerPathAsync(tempAppJsonPath);
+
             // Act
-            var result = await _service.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: false);
+            var result = await _compilerService.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: false);
 
             // Assert
+            _output.WriteLine($"Success: {result.Success}");
+            _output.WriteLine($"StdOut: {result.StdOut}");
+            _output.WriteLine($"StdErr: {result.StdErr}");
+            _output.WriteLine($"Warnings: {result.Warnings.Count}");
+            _output.WriteLine($"Errors: {result.Errors.Count}");
+
             Assert.True(result.Success, $"Compilation should succeed: {result.Message}");
 
             // Warnings should be visible in raw output
             var combinedOutput = (result.StdOut ?? "") + (result.StdErr ?? "");
             Assert.Contains(": warning ", combinedOutput);
-            Assert.Contains("AL0432", combinedOutput); // Obsolete warning code
+            Assert.Contains("AL0432", combinedOutput);
 
             // Warnings should also be in the parsed list
             Assert.NotEmpty(result.Warnings);
         }
         finally
         {
-            if (Directory.Exists(tempDir))
-            {
-                Directory.Delete(tempDir, recursive: true);
-            }
+            CleanupTempDir(tempDir);
         }
     }
 
@@ -79,23 +74,31 @@ public class WarningSuppressionIntegrationTests
     public async Task CompileAsync_AppWithWarnings_SuppressWarningsTrue_HidesWarningsFromOutput()
     {
         // Arrange
-        var compilerPath = GetCompilerPath();
-        if (!File.Exists(compilerPath))
-        {
-            return; // Skip if compiler not available
-        }
+        var testAppPath = Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "AppWithWarnings");
+        var appJsonPath = Path.Combine(testAppPath, "app.json");
 
-        var testAppPath = Path.Combine(_fixturesPath, "AppWithWarnings");
-        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-test-{Guid.NewGuid()}");
-        CopyDirectory(testAppPath, tempDir);
-        var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+        Assert.True(File.Exists(appJsonPath), $"Test app.json should exist at {appJsonPath}");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-warning-test-{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
 
         try
         {
+            CopyDirectory(testAppPath, tempDir);
+            var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+
+            var compilerPath = await GetCompilerPathAsync(tempAppJsonPath);
+
             // Act
-            var result = await _service.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: true);
+            var result = await _compilerService.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: true);
 
             // Assert
+            _output.WriteLine($"Success: {result.Success}");
+            _output.WriteLine($"StdOut: {result.StdOut}");
+            _output.WriteLine($"StdErr: {result.StdErr}");
+            _output.WriteLine($"Warnings: {result.Warnings.Count}");
+
             Assert.True(result.Success, $"Compilation should succeed: {result.Message}");
 
             // Warnings should NOT be visible in raw output
@@ -105,15 +108,12 @@ public class WarningSuppressionIntegrationTests
             // Warnings list should be empty
             Assert.Empty(result.Warnings);
 
-            // Compilation message should still be there
+            // App should still be compiled
             Assert.NotNull(result.AppPath);
         }
         finally
         {
-            if (Directory.Exists(tempDir))
-            {
-                Directory.Delete(tempDir, recursive: true);
-            }
+            CleanupTempDir(tempDir);
         }
     }
 
@@ -121,26 +121,35 @@ public class WarningSuppressionIntegrationTests
     public async Task CompileAsync_AppWithErrors_SuppressWarningsTrue_StillShowsErrors()
     {
         // Arrange
-        var compilerPath = GetCompilerPath();
-        if (!File.Exists(compilerPath))
-        {
-            return; // Skip if compiler not available
-        }
+        var testAppPath = Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "AppWithErrors");
+        var appJsonPath = Path.Combine(testAppPath, "app.json");
 
-        var testAppPath = Path.Combine(_fixturesPath, "AppWithErrors");
-        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-test-{Guid.NewGuid()}");
-        CopyDirectory(testAppPath, tempDir);
-        var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+        Assert.True(File.Exists(appJsonPath), $"Test app.json should exist at {appJsonPath}");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-warning-test-{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
 
         try
         {
+            CopyDirectory(testAppPath, tempDir);
+            var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+
+            var compilerPath = await GetCompilerPathAsync(tempAppJsonPath);
+
             // Act
-            var result = await _service.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: true);
+            var result = await _compilerService.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: true);
 
             // Assert
+            _output.WriteLine($"Success: {result.Success}");
+            _output.WriteLine($"StdOut: {result.StdOut}");
+            _output.WriteLine($"StdErr: {result.StdErr}");
+            _output.WriteLine($"Errors: {result.Errors.Count}");
+            _output.WriteLine($"Warnings: {result.Warnings.Count}");
+
             Assert.False(result.Success, "Compilation should fail due to errors");
 
-            // Errors should still be visible in raw output (not filtered)
+            // Errors should still be visible in raw output
             var combinedOutput = (result.StdOut ?? "") + (result.StdErr ?? "");
             Assert.Contains(": error ", combinedOutput);
 
@@ -155,10 +164,7 @@ public class WarningSuppressionIntegrationTests
         }
         finally
         {
-            if (Directory.Exists(tempDir))
-            {
-                Directory.Delete(tempDir, recursive: true);
-            }
+            CleanupTempDir(tempDir);
         }
     }
 
@@ -166,23 +172,32 @@ public class WarningSuppressionIntegrationTests
     public async Task CompileAsync_AppWithErrors_SuppressWarningsFalse_ShowsBothErrorsAndWarnings()
     {
         // Arrange
-        var compilerPath = GetCompilerPath();
-        if (!File.Exists(compilerPath))
-        {
-            return; // Skip if compiler not available
-        }
+        var testAppPath = Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "Fixtures", "AppWithErrors");
+        var appJsonPath = Path.Combine(testAppPath, "app.json");
 
-        var testAppPath = Path.Combine(_fixturesPath, "AppWithErrors");
-        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-test-{Guid.NewGuid()}");
-        CopyDirectory(testAppPath, tempDir);
-        var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+        Assert.True(File.Exists(appJsonPath), $"Test app.json should exist at {appJsonPath}");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"bcdev-warning-test-{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
 
         try
         {
+            CopyDirectory(testAppPath, tempDir);
+            var tempAppJsonPath = Path.Combine(tempDir, "app.json");
+
+            var compilerPath = await GetCompilerPathAsync(tempAppJsonPath);
+
             // Act
-            var result = await _service.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: false);
+            var result = await _compilerService.CompileAsync(tempAppJsonPath, compilerPath, null, suppressWarnings: false);
 
             // Assert
+            _output.WriteLine($"Success: {result.Success}");
+            _output.WriteLine($"StdOut: {result.StdOut}");
+            _output.WriteLine($"StdErr: {result.StdErr}");
+            _output.WriteLine($"Errors: {result.Errors.Count}");
+            _output.WriteLine($"Warnings: {result.Warnings.Count}");
+
             Assert.False(result.Success, "Compilation should fail due to errors");
 
             // Both errors and warnings should be visible
@@ -196,9 +211,70 @@ public class WarningSuppressionIntegrationTests
         }
         finally
         {
-            if (Directory.Exists(tempDir))
+            CleanupTempDir(tempDir);
+        }
+    }
+
+    private async Task<string> GetCompilerPathAsync(string appJsonPath)
+    {
+        _output.WriteLine("Resolving compiler version from app.json...");
+        var version = await _artifactService.ResolveVersionFromAppJsonAsync(appJsonPath);
+        _output.WriteLine($"BC version: {version}");
+
+        _output.WriteLine("Downloading compiler artifacts...");
+        await _artifactService.EnsureArtifactsAsync(version);
+
+        var compilerPath = _artifactService.GetCachedCompilerPath(version);
+        Assert.NotNull(compilerPath);
+        Assert.True(File.Exists(compilerPath), $"Compiler should exist at {compilerPath}");
+        _output.WriteLine($"Compiler: {compilerPath}");
+
+        // Verify compiler can run
+        Assert.True(CanRunCompiler(compilerPath),
+            "Compiler must be able to run. BC compiler is x64 only - on ARM64 macOS requires Rosetta + x64 .NET runtime.");
+
+        return compilerPath;
+    }
+
+    private bool CanRunCompiler(string compilerPath)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = compilerPath,
+                Arguments = "",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process == null) return false;
+
+            var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+            process.WaitForExit(5000);
+
+            return output.Contains("AL Compiler") || output.Contains("Microsoft");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void CleanupTempDir(string tempDir)
+    {
+        if (Directory.Exists(tempDir))
+        {
+            try
             {
                 Directory.Delete(tempDir, recursive: true);
+            }
+            catch
+            {
+                // Ignore cleanup errors
             }
         }
     }
@@ -215,6 +291,8 @@ public class WarningSuppressionIntegrationTests
 
         foreach (var dir in Directory.GetDirectories(sourceDir))
         {
+            if (Path.GetFileName(dir).StartsWith(".")) continue;
+
             var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
             CopyDirectory(dir, destSubDir);
         }
