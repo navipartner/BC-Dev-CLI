@@ -35,6 +35,32 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          # Extract tag name (e.g., v0.5 -> 0.5)
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+          # Convert to valid .NET version (e.g., 0.5 -> 0.5.0, 0.5.1 -> 0.5.1)
+          if [[ "$TAG" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            VERSION="${TAG}.0"
+          else
+            VERSION="$TAG"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # File version needs 4 parts
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            FILE_VERSION="${VERSION}.0"
+          else
+            FILE_VERSION="$VERSION"
+          fi
+          echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
+
+          echo "Tag: $TAG, Version: $VERSION, FileVersion: $FILE_VERSION"
+
       - name: Restore dependencies
         run: dotnet restore src/bcdev.csproj
 
@@ -47,6 +73,10 @@ jobs:
             -p:PublishSingleFile=true \
             -p:SelfContained=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -p:InformationalVersion=${{ steps.version.outputs.tag }} \
+            -p:FileVersion=${{ steps.version.outputs.file_version }} \
+            -p:AssemblyVersion=${{ steps.version.outputs.file_version }} \
             -o publish
 
       - name: Prepare artifact

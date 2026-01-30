@@ -88,12 +88,10 @@ public class NuGetSymbolsCompileTests
             Assert.True(File.Exists(compilerPath), $"Compiler should exist at {compilerPath}");
             _output.WriteLine($"Compiler: {compilerPath}");
 
-            // Check if compiler can run on this platform
-            if (!CanRunCompiler(compilerPath))
-            {
-                _output.WriteLine("SKIP: Compiler cannot run on this platform (likely ARM64 without Rosetta)");
-                return;
-            }
+            // Verify compiler can run on this platform (required - no skipping)
+            var canRun = CanRunCompiler(compilerPath);
+            _output.WriteLine($"Compiler runnable: {canRun}");
+            Assert.True(canRun, "Compiler must be able to run on this platform. BC compiler is x64 only - on ARM64 macOS requires Rosetta + x64 .NET runtime.");
 
             // Step 3: Compile with downloaded symbols
             _output.WriteLine("Step 3: Compiling with downloaded symbols...");
