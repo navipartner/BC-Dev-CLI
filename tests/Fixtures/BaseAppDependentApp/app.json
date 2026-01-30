@@ -1,0 +1,29 @@
+{
+  "id": "55555555-5555-5555-5555-555555555555",
+  "name": "BaseApp Dependent Test",
+  "publisher": "TestPublisher",
+  "version": "1.0.0.0",
+  "brief": "Test app that depends on Base Application",
+  "description": "For testing NuGet symbol download followed by compilation",
+  "platform": "26.0.0.0",
+  "application": "26.0.0.0",
+  "runtime": "13.0",
+  "target": "OnPrem",
+  "idRanges": [
+    {
+      "from": 50200,
+      "to": 50299
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "437dbf0e-84ff-417a-965d-ed2bb9650972",
+      "name": "Base Application",
+      "publisher": "Microsoft",
+      "version": "26.0.0.0"
+    }
+  ],
+  "features": [
+    "NoImplicitWith"
+  ]
+}
