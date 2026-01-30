@@ -11,7 +11,9 @@ bcdev test \
   -launchJsonPath "/path/to/.vscode/launch.json" \
   -launchJsonName "Your Config Name" \
   -Username "bcuser" \
-  -Password "bcpassword"
+  -Password "bcpassword" \
+  -CodeunitId 50100 \
+  -MethodName "TestSalesOrderCreation"
 ```
 
 ### Compiling an App
