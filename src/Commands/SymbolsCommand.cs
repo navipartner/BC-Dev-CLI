@@ -28,24 +28,24 @@ public static class SymbolsCommand
 
         var fromServerOption = new Option<bool>(
             name: "-fromServer",
-            description: "Download from BC server instead of NuGet feeds (requires -launchJsonPath)",
+            description: "Download from BC server instead of NuGet feeds (requires launch.json)",
             getDefaultValue: () => false);
 
         var launchJsonPathOption = new Option<string?>(
             name: "-launchJsonPath",
-            description: "Path to launch.json file (required with -fromServer)");
+            description: "Path to launch.json file (required for server mode)");
 
         var launchJsonNameOption = new Option<string?>(
             name: "-launchJsonName",
-            description: "Configuration name in launch.json (required with -fromServer)");
+            description: "Configuration name in launch.json (required for server mode)");
 
         var usernameOption = new Option<string?>(
             name: "-Username",
-            description: "Username for authentication (used with -fromServer)");
+            description: "Username for authentication (server mode)");
 
         var passwordOption = new Option<string?>(
             name: "-Password",
-            description: "Password for authentication (used with -fromServer)");
+            description: "Password for authentication (server mode)");
 
         command.AddOption(appJsonPathOption);
         command.AddOption(packageCachePathOption);
@@ -90,7 +90,7 @@ public static class SymbolsCommand
 
         if (fromServer)
         {
-            // Validate required options for server mode
+            // Server mode (opt-in) - validate required options
             if (string.IsNullOrEmpty(launchJsonPath))
             {
                 Console.Error.WriteLine("Error: -launchJsonPath is required when using -fromServer");

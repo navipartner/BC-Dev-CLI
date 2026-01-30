@@ -200,6 +200,25 @@ public class SymbolService
             AppId = NuGetFeedService.BaseApplicationAppId
         });
 
+        // System Application symbol (required by Base Application)
+        symbols.Add(new SymbolInfo
+        {
+            Publisher = "Microsoft",
+            Name = "System Application",
+            Version = applicationVersion,
+            AppId = NuGetFeedService.SystemApplicationAppId
+        });
+
+        // Business Foundation symbol (required by Base Application in BC 24.0+)
+        // Note: This package may not exist in NuGet for all versions
+        symbols.Add(new SymbolInfo
+        {
+            Publisher = "Microsoft",
+            Name = "Business Foundation",
+            Version = applicationVersion,
+            AppId = NuGetFeedService.BusinessFoundationAppId
+        });
+
         // Explicit dependencies from app.json
         if (appJson.Dependencies != null)
         {

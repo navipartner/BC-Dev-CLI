@@ -16,8 +16,8 @@ public class ArtifactService
     private const string ArtifactCdnBaseUrl = "https://bcartifacts-exdbf9fwegejdqak.b02.azurefd.net";
     private const string DefaultArtifactType = "sandbox";
     private const string DefaultCountry = "w1";
-    
-    private readonly HttpClient _httpClient = new();
+
+    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromMinutes(10) };
     private List<VersionInfo>? _versionCache;
 
     /// <summary>

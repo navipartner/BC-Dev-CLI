@@ -7,6 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>bcdev</AssemblyName>
+
+    <!-- Version defaults for local builds, overridden by CI -->
+    <Version>0.0.0-local</Version>
+    <InformationalVersion>0.0.0-local</InformationalVersion>
+    <FileVersion>0.0.0.0</FileVersion>
+    <AssemblyVersion>0.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
