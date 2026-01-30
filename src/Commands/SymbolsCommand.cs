@@ -26,9 +26,9 @@ public static class SymbolsCommand
             description: "Country/region code for localized symbols (e.g., us, de, dk). Default 'w1' uses country-less packages.",
             getDefaultValue: () => "w1");
 
-        var fromNuGetOption = new Option<bool>(
-            name: "-fromNuGet",
-            description: "Download from NuGet feeds instead of BC server (experimental)",
+        var fromServerOption = new Option<bool>(
+            name: "-fromServer",
+            description: "Download from BC server instead of NuGet feeds (requires launch.json)",
             getDefaultValue: () => false);
 
         var launchJsonPathOption = new Option<string?>(
@@ -50,7 +50,7 @@ public static class SymbolsCommand
         command.AddOption(appJsonPathOption);
         command.AddOption(packageCachePathOption);
         command.AddOption(countryOption);
-        command.AddOption(fromNuGetOption);
+        command.AddOption(fromServerOption);
         command.AddOption(launchJsonPathOption);
         command.AddOption(launchJsonNameOption);
         command.AddOption(usernameOption);
@@ -61,13 +61,13 @@ public static class SymbolsCommand
             var appJsonPath = context.ParseResult.GetValueForOption(appJsonPathOption)!;
             var packageCachePath = context.ParseResult.GetValueForOption(packageCachePathOption);
             var country = context.ParseResult.GetValueForOption(countryOption)!;
-            var fromNuGet = context.ParseResult.GetValueForOption(fromNuGetOption);
+            var fromServer = context.ParseResult.GetValueForOption(fromServerOption);
             var launchJsonPath = context.ParseResult.GetValueForOption(launchJsonPathOption);
             var launchJsonName = context.ParseResult.GetValueForOption(launchJsonNameOption);
             var username = context.ParseResult.GetValueForOption(usernameOption);
             var password = context.ParseResult.GetValueForOption(passwordOption);
 
-            await ExecuteAsync(appJsonPath, packageCachePath, country, fromNuGet,
+            await ExecuteAsync(appJsonPath, packageCachePath, country, fromServer,
                 launchJsonPath, launchJsonName, username, password);
         });
 
@@ -78,7 +78,7 @@ public static class SymbolsCommand
         string appJsonPath,
         string? packageCachePath,
         string country,
-        bool fromNuGet,
+        bool fromServer,
         string? launchJsonPath,
         string? launchJsonName,
         string? username,
@@ -88,30 +88,30 @@ public static class SymbolsCommand
 
         Models.SymbolsResult result;
 
-        if (fromNuGet)
+        if (fromServer)
         {
-            // NuGet mode (opt-in)
-            result = await symbolService.DownloadFromNuGetAsync(
-                appJsonPath, packageCachePath, country);
-        }
-        else
-        {
-            // Server mode (default) - validate required options
+            // Server mode (opt-in) - validate required options
             if (string.IsNullOrEmpty(launchJsonPath))
             {
-                Console.Error.WriteLine("Error: -launchJsonPath is required (use -fromNuGet to download from NuGet feeds instead)");
+                Console.Error.WriteLine("Error: -launchJsonPath is required when using -fromServer");
                 Environment.ExitCode = 1;
                 return;
             }
             if (string.IsNullOrEmpty(launchJsonName))
             {
-                Console.Error.WriteLine("Error: -launchJsonName is required (use -fromNuGet to download from NuGet feeds instead)");
+                Console.Error.WriteLine("Error: -launchJsonName is required when using -fromServer");
                 Environment.ExitCode = 1;
                 return;
             }
 
             result = await symbolService.DownloadFromServerAsync(
                 appJsonPath, launchJsonPath, launchJsonName, packageCachePath, username, password);
+        }
+        else
+        {
+            // NuGet mode (default)
+            result = await symbolService.DownloadFromNuGetAsync(
+                appJsonPath, packageCachePath, country);
         }
 
         Console.WriteLine(JsonSerializer.Serialize(result, JsonContext.Default.SymbolsResult));
