@@ -35,6 +35,28 @@ bcdev publish \
   -Password "bcpassword"
 ```
 
+### Downloading Symbols
+
+**NuGet mode (default):**
+```bash
+# Download symbols from NuGet feeds (no BC server required)
+bcdev symbols -appJsonPath "/path/to/app.json"
+
+# With country-specific packages (e.g., US, DE, DK)
+bcdev symbols -appJsonPath "/path/to/app.json" -country us
+```
+
+**Server mode (opt-in):**
+```bash
+bcdev symbols \
+  -appJsonPath "/path/to/app.json" \
+  -fromServer \
+  -launchJsonPath "/path/to/.vscode/launch.json" \
+  -launchJsonName "Your Config Name" \
+  -Username "bcuser" \
+  -Password "bcpassword"
+```
+
 ## Commands
 
 ### `bcdev compile`
@@ -83,26 +105,6 @@ Run tests against Business Central.
 ### `bcdev symbols`
 
 Download symbol packages for compilation dependencies. By default, downloads from Microsoft's public NuGet feeds (faster, works offline/CI). Optionally download from a BC server with `-fromServer`.
-
-**NuGet mode (default):**
-```bash
-# Download symbols from NuGet feeds (no BC server required)
-bcdev symbols -appJsonPath "/path/to/app.json"
-
-# With country-specific packages (e.g., US, DE, DK)
-bcdev symbols -appJsonPath "/path/to/app.json" -country us
-```
-
-**Server mode (opt-in):**
-```bash
-bcdev symbols \
-  -appJsonPath "/path/to/app.json" \
-  -fromServer \
-  -launchJsonPath "/path/to/.vscode/launch.json" \
-  -launchJsonName "Your Config Name" \
-  -Username "bcuser" \
-  -Password "bcpassword"
-```
 
 | Option | Required | Description |
 |--------|----------|-------------|
