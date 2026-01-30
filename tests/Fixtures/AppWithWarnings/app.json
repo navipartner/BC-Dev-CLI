@@ -1,0 +1,20 @@
+{
+  "id": "66666666-6666-6666-6666-666666666666",
+  "name": "App With Warnings",
+  "publisher": "TestPublisher",
+  "version": "1.0.0.0",
+  "brief": "App that generates deprecation warnings for testing",
+  "description": "Contains obsolete procedures that trigger AL0432 warnings",
+  "platform": "27.0.0.0",
+  "runtime": "14.0",
+  "target": "OnPrem",
+  "idRanges": [
+    {
+      "from": 50100,
+      "to": 50199
+    }
+  ],
+  "features": [
+    "NoImplicitWith"
+  ]
+}

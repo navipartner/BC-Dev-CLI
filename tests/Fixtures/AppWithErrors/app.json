@@ -1,0 +1,20 @@
+{
+  "id": "77777777-7777-7777-7777-777777777777",
+  "name": "App With Errors",
+  "publisher": "TestPublisher",
+  "version": "1.0.0.0",
+  "brief": "App that has compilation errors for testing",
+  "description": "Contains invalid AL code that triggers compilation errors",
+  "platform": "27.0.0.0",
+  "runtime": "14.0",
+  "target": "OnPrem",
+  "idRanges": [
+    {
+      "from": 50200,
+      "to": 50299
+    }
+  ],
+  "features": [
+    "NoImplicitWith"
+  ]
+}
