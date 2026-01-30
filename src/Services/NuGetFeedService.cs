@@ -271,13 +271,77 @@ public class NuGetFeedService : IDisposable
     }
 
     /// <summary>
-    /// Find exact matching version from available versions (strict matching)
+    /// Find matching version from available versions.
+    /// Priority: exact match > closest higher version in same major.minor
     /// </summary>
     public static string? FindMatchingVersion(List<string> availableVersions, string targetVersion)
     {
-        // Strict matching: only return exact version match
-        return availableVersions.FirstOrDefault(v =>
+        if (availableVersions.Count == 0) return null;
+
+        // Try exact match first
+        var exact = availableVersions.FirstOrDefault(v =>
             v.Equals(targetVersion, StringComparison.OrdinalIgnoreCase));
+        if (exact != null) return exact;
+
+        // Parse target version
+        var targetParts = ParseVersionParts(targetVersion);
+        if (targetParts == null) return null;
+
+        // Find closest higher version in same major.minor
+        string? bestMatch = null;
+        (int major, int minor, int build, int rev)? bestParts = null;
+
+        foreach (var version in availableVersions)
+        {
+            var parts = ParseVersionParts(version);
+            if (parts == null) continue;
+
+            // Must match major.minor
+            if (parts.Value.major != targetParts.Value.major ||
+                parts.Value.minor != targetParts.Value.minor)
+                continue;
+
+            // Must be >= target build
+            if (parts.Value.build < targetParts.Value.build)
+                continue;
+
+            // If same build, revision must be >= target
+            if (parts.Value.build == targetParts.Value.build &&
+                parts.Value.rev < targetParts.Value.rev)
+                continue;
+
+            // Is this better (lower) than current best?
+            if (bestParts == null ||
+                parts.Value.build < bestParts.Value.build ||
+                (parts.Value.build == bestParts.Value.build && parts.Value.rev < bestParts.Value.rev))
+            {
+                bestMatch = version;
+                bestParts = parts;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    /// <summary>
+    /// Parse version string into parts. Handles 3-part (27.0.45024) and 4-part (27.0.45024.0) formats.
+    /// </summary>
+    private static (int major, int minor, int build, int rev)? ParseVersionParts(string version)
+    {
+        var segments = version.Split('.');
+        if (segments.Length < 3) return null;
+
+        if (!int.TryParse(segments[0], out var major)) return null;
+        if (!int.TryParse(segments[1], out var minor)) return null;
+        if (!int.TryParse(segments[2], out var build)) return null;
+
+        var rev = 0;
+        if (segments.Length >= 4)
+        {
+            int.TryParse(segments[3], out rev);
+        }
+
+        return (major, minor, build, rev);
     }
 
     /// <summary>
