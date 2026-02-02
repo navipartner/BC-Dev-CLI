@@ -457,8 +457,10 @@ public class ArtifactService
             var name = System.Text.Encoding.UTF8.GetString(nameBytes);
 
             // Check if this is a target file
-            var fileName = Path.GetFileName(name);
-            var matchedTarget = targetFileNames.FirstOrDefault(t => 
+            // Normalize path separators - older BC artifacts (BC15-BC22) use Windows-style backslashes
+            var normalizedName = name.Replace('\\', '/');
+            var fileName = Path.GetFileName(normalizedName);
+            var matchedTarget = targetFileNames.FirstOrDefault(t =>
                 fileName.Equals(t, StringComparison.OrdinalIgnoreCase));
             
             if (matchedTarget != null)
@@ -467,10 +469,10 @@ public class ArtifactService
                 {
                     allMatches[matchedTarget] = new List<ZipCentralDirectoryEntry>();
                 }
-                
+
                 allMatches[matchedTarget].Add(new ZipCentralDirectoryEntry
                 {
-                    Name = name,
+                    Name = normalizedName,
                     Compression = compression,
                     CompressedSize = compressedSize,
                     UncompressedSize = uncompressedSize,
