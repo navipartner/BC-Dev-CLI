@@ -21,13 +21,18 @@ bcdev test \
 ```bash
 bcdev compile \
   -appJsonPath "/path/to/app.json"
+
+# With compiler options
+bcdev compile \
+  -appJsonPath "/path/to/app.json" \
+  -parallel \
+  -maxDegreeOfParallelism 4
 ```
 
 ### Publishing an App
 
 ```bash
 bcdev publish \
-  -recompile \
   -appPath "/path/to/MyApp.app" \
   -launchJsonPath "/path/to/.vscode/launch.json" \
   -launchJsonName "Your Config Name" \
@@ -67,6 +72,11 @@ Compile an AL application.
 |--------|----------|-------------|
 | `-appJsonPath` | Yes | Path to app.json file |
 | `-packageCachePath` | No | Path to .alpackages folder |
+| `-suppressWarnings` | No | Suppress compiler warnings from output |
+| `-generateReportLayout` | No | Generate report layout files |
+| `-parallel` | No | Enable parallel compilation |
+| `-maxDegreeOfParallelism` | No | Max concurrent compilation tasks |
+| `-continueBuildOnError` | No | Continue building even if errors found |
 
 ### `bcdev publish`
 
@@ -74,18 +84,13 @@ Publish an AL application to Business Central.
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `-appPath` | Yes* | Path to .app file |
-| `-recompile` | No | Compile before publishing |
-| `-appJsonPath` | Yes** | Path to app.json (with -recompile) |
+| `-appPath` | Yes | Path to .app file |
 | `-launchJsonPath` | Yes | Path to launch.json |
 | `-launchJsonName` | Yes | Configuration name |
-| `-authType` | No | UserPassword or AAD |
-| `-Username` | Yes*** | Username |
-| `-Password` | Yes*** | Password |
+| `-Username` | Yes* | Username |
+| `-Password` | Yes* | Password |
 
-*Required when not using -recompile
-**Required with -recompile
-***Required for UserPassword auth
+*Required for UserPassword auth
 
 ### `bcdev test`
 
