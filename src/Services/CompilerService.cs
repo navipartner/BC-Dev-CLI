@@ -260,4 +260,50 @@ public class CompilerService
         var filteredLines = lines.Where(line => !line.Contains(": warning ")).ToArray();
         return string.Join("\n", filteredLines);
     }
+
+    /// <summary>
+    /// Build compiler command-line arguments string
+    /// </summary>
+    public static string BuildCompilerArguments(
+        string projectPath,
+        string outputPath,
+        string? packageCachePath,
+        bool? generateReportLayout,
+        bool? parallel,
+        int? maxDegreeOfParallelism,
+        bool? continueBuildOnError)
+    {
+        var args = new List<string>
+        {
+            $"/project:\"{projectPath}\"",
+            $"/out:\"{outputPath}\""
+        };
+
+        if (!string.IsNullOrEmpty(packageCachePath))
+        {
+            args.Add($"/packagecachepath:\"{packageCachePath}\"");
+        }
+
+        if (generateReportLayout.HasValue)
+        {
+            args.Add($"/generatereportlayout{(generateReportLayout.Value ? "+" : "-")}");
+        }
+
+        if (parallel.HasValue)
+        {
+            args.Add($"/parallel{(parallel.Value ? "+" : "-")}");
+        }
+
+        if (maxDegreeOfParallelism.HasValue)
+        {
+            args.Add($"/maxdegreeofparallelism:{maxDegreeOfParallelism.Value}");
+        }
+
+        if (continueBuildOnError.HasValue)
+        {
+            args.Add($"/continuebuildonerror{(continueBuildOnError.Value ? "+" : "-")}");
+        }
+
+        return string.Join(" ", args);
+    }
 }
