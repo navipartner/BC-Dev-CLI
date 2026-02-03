@@ -25,19 +25,63 @@ public static class CompileCommand
             description: "Suppress compiler warnings from the output",
             getDefaultValue: () => false);
 
+        var generateReportLayoutOption = new Option<bool?>(
+            name: "-generateReportLayout",
+            description: "Generate report layout files during compilation");
+
+        var parallelOption = new Option<bool?>(
+            name: "-parallel",
+            description: "Enable parallel compilation");
+
+        var maxDegreeOfParallelismOption = new Option<int?>(
+            name: "-maxDegreeOfParallelism",
+            description: "Maximum number of concurrent compilation tasks");
+
+        var continueBuildOnErrorOption = new Option<bool?>(
+            name: "-continueBuildOnError",
+            description: "Continue building even if errors are found");
+
         command.AddOption(appJsonPathOption);
         command.AddOption(packageCachePathOption);
         command.AddOption(suppressWarningsOption);
+        command.AddOption(generateReportLayoutOption);
+        command.AddOption(parallelOption);
+        command.AddOption(maxDegreeOfParallelismOption);
+        command.AddOption(continueBuildOnErrorOption);
 
-        command.SetHandler(async (appJsonPath, packageCachePath, suppressWarnings) =>
+        command.SetHandler(async (context) =>
         {
-            await ExecuteAsync(appJsonPath, packageCachePath, suppressWarnings);
-        }, appJsonPathOption, packageCachePathOption, suppressWarningsOption);
+            var appJsonPath = context.ParseResult.GetValueForOption(appJsonPathOption)!;
+            var packageCachePath = context.ParseResult.GetValueForOption(packageCachePathOption);
+            var suppressWarnings = context.ParseResult.GetValueForOption(suppressWarningsOption);
+            var generateReportLayout = context.ParseResult.GetValueForOption(generateReportLayoutOption);
+            var parallel = context.ParseResult.GetValueForOption(parallelOption);
+            var maxDegreeOfParallelism = context.ParseResult.GetValueForOption(maxDegreeOfParallelismOption);
+            var continueBuildOnError = context.ParseResult.GetValueForOption(continueBuildOnErrorOption);
+
+            // Validate maxDegreeOfParallelism if provided
+            if (maxDegreeOfParallelism.HasValue && maxDegreeOfParallelism.Value <= 0)
+            {
+                Console.Error.WriteLine("Error: -maxDegreeOfParallelism must be greater than 0");
+                context.ExitCode = 1;
+                return;
+            }
+
+            await ExecuteAsync(appJsonPath, packageCachePath, suppressWarnings,
+                generateReportLayout, parallel, maxDegreeOfParallelism, continueBuildOnError);
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(string appJsonPath, string? packageCachePath, bool suppressWarnings)
+    private static async Task ExecuteAsync(
+        string appJsonPath,
+        string? packageCachePath,
+        bool suppressWarnings,
+        bool? generateReportLayout,
+        bool? parallel,
+        int? maxDegreeOfParallelism,
+        bool? continueBuildOnError)
     {
         // Auto-download compiler based on app.json platform version
         var artifactService = new ArtifactService();
@@ -47,7 +91,9 @@ public static class CompileCommand
             ?? throw new InvalidOperationException($"Failed to get compiler path for version {version}");
 
         var compilerService = new CompilerService();
-        var result = await compilerService.CompileAsync(appJsonPath, compilerPath, packageCachePath, suppressWarnings);
+        var result = await compilerService.CompileAsync(
+            appJsonPath, compilerPath, packageCachePath, suppressWarnings,
+            generateReportLayout, parallel, maxDegreeOfParallelism, continueBuildOnError);
 
         // Output result as JSON
         Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, JsonContext.Default.CompileResult));
