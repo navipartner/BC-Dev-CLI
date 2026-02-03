@@ -38,4 +38,112 @@ public class CompilerServiceTests
         Assert.False(result.Success);
         Assert.Contains("Compiler not found", result.Message);
     }
+
+    [Theory]
+    [InlineData(true, "/generatereportlayout+")]
+    [InlineData(false, "/generatereportlayout-")]
+    public void BuildArguments_GenerateReportLayout_AddsFlag(bool value, string expected)
+    {
+        var args = CompilerService.BuildCompilerArguments(
+            projectPath: "/project",
+            outputPath: "/out.app",
+            packageCachePath: null,
+            generateReportLayout: value,
+            parallel: null,
+            maxDegreeOfParallelism: null,
+            continueBuildOnError: null);
+
+        Assert.Contains(expected, args);
+    }
+
+    [Theory]
+    [InlineData(true, "/parallel+")]
+    [InlineData(false, "/parallel-")]
+    public void BuildArguments_Parallel_AddsFlag(bool value, string expected)
+    {
+        var args = CompilerService.BuildCompilerArguments(
+            projectPath: "/project",
+            outputPath: "/out.app",
+            packageCachePath: null,
+            generateReportLayout: null,
+            parallel: value,
+            maxDegreeOfParallelism: null,
+            continueBuildOnError: null);
+
+        Assert.Contains(expected, args);
+    }
+
+    [Theory]
+    [InlineData(1, "/maxdegreeofparallelism:1")]
+    [InlineData(4, "/maxdegreeofparallelism:4")]
+    [InlineData(8, "/maxdegreeofparallelism:8")]
+    public void BuildArguments_MaxDegreeOfParallelism_AddsFlag(int value, string expected)
+    {
+        var args = CompilerService.BuildCompilerArguments(
+            projectPath: "/project",
+            outputPath: "/out.app",
+            packageCachePath: null,
+            generateReportLayout: null,
+            parallel: null,
+            maxDegreeOfParallelism: value,
+            continueBuildOnError: null);
+
+        Assert.Contains(expected, args);
+    }
+
+    [Theory]
+    [InlineData(true, "/continuebuildonerror+")]
+    [InlineData(false, "/continuebuildonerror-")]
+    public void BuildArguments_ContinueBuildOnError_AddsFlag(bool value, string expected)
+    {
+        var args = CompilerService.BuildCompilerArguments(
+            projectPath: "/project",
+            outputPath: "/out.app",
+            packageCachePath: null,
+            generateReportLayout: null,
+            parallel: null,
+            maxDegreeOfParallelism: null,
+            continueBuildOnError: value);
+
+        Assert.Contains(expected, args);
+    }
+
+    [Fact]
+    public void BuildArguments_NullOptions_OmitsFlags()
+    {
+        var args = CompilerService.BuildCompilerArguments(
+            projectPath: "/project",
+            outputPath: "/out.app",
+            packageCachePath: null,
+            generateReportLayout: null,
+            parallel: null,
+            maxDegreeOfParallelism: null,
+            continueBuildOnError: null);
+
+        Assert.DoesNotContain("/generatereportlayout", args);
+        Assert.DoesNotContain("/parallel", args);
+        Assert.DoesNotContain("/maxdegreeofparallelism", args);
+        Assert.DoesNotContain("/continuebuildonerror", args);
+    }
+
+    [Fact]
+    public void BuildArguments_AllOptions_AddsAllFlags()
+    {
+        var args = CompilerService.BuildCompilerArguments(
+            projectPath: "/project",
+            outputPath: "/out.app",
+            packageCachePath: "/packages",
+            generateReportLayout: true,
+            parallel: true,
+            maxDegreeOfParallelism: 4,
+            continueBuildOnError: false);
+
+        Assert.Contains("/project:", args);
+        Assert.Contains("/out:", args);
+        Assert.Contains("/packagecachepath:", args);
+        Assert.Contains("/generatereportlayout+", args);
+        Assert.Contains("/parallel+", args);
+        Assert.Contains("/maxdegreeofparallelism:4", args);
+        Assert.Contains("/continuebuildonerror-", args);
+    }
 }
