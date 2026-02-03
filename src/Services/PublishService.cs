@@ -27,10 +27,7 @@ public class PublishService
     /// Publish an AL application to Business Central
     /// </summary>
     public async Task<PublishResult> PublishAsync(
-        bool recompile,
-        string? appPath,
-        string? appJsonPath,
-        string? packageCachePath,
+        string appPath,
         string launchJsonPath,
         string launchJsonName,
         string? username,
@@ -40,32 +37,8 @@ public class PublishService
 
         try
         {
-            // If recompile flag is set, compile first (suppress warnings for cleaner output)
-            if (recompile)
-            {
-                // Auto-download compiler based on app.json platform version
-                var artifactService = new ArtifactService();
-                var version = await artifactService.ResolveVersionFromAppJsonAsync(appJsonPath!);
-                await artifactService.EnsureArtifactsAsync(version);
-                var compilerPath = artifactService.GetCachedCompilerPath(version)
-                    ?? throw new InvalidOperationException($"Failed to get compiler path for version {version}");
-
-                var compilerService = new CompilerService();
-                var compileResult = await compilerService.CompileAsync(appJsonPath!, compilerPath, packageCachePath, suppressWarnings: true);
-
-                if (!compileResult.Success)
-                {
-                    result.Success = false;
-                    result.Message = "Compilation failed";
-                    result.Error = compileResult.Message;
-                    return result;
-                }
-
-                appPath = compileResult.AppPath;
-            }
-
             // Validate app path
-            if (string.IsNullOrEmpty(appPath) || !File.Exists(appPath))
+            if (!File.Exists(appPath))
             {
                 result.Success = false;
                 result.Message = "App file not found";
