@@ -9,24 +9,13 @@ public static class PublishCommand
     {
         var command = new Command("publish", "Publish an AL application to Business Central");
 
-        // Option to trigger recompile before publish
-        var recompileOption = new Option<bool>(
-            name: "-recompile",
-            description: "Compile the app before publishing",
-            getDefaultValue: () => false);
-
         // Path options
-        var appPathOption = new Option<string?>(
+        var appPathOption = new Option<string>(
             name: "-appPath",
-            description: "Path to .app file (required if not using -recompile)");
-
-        var appJsonPathOption = new Option<string?>(
-            name: "-appJsonPath",
-            description: "Path to app.json file (required with -recompile)");
-
-        var packageCachePathOption = new Option<string?>(
-            name: "-packageCachePath",
-            description: "Path to .alpackages folder containing symbol packages (used with -recompile)");
+            description: "Path to .app file")
+        {
+            IsRequired = true
+        };
 
         var launchJsonPathOption = new Option<string>(
             name: "-launchJsonPath",
@@ -51,10 +40,7 @@ public static class PublishCommand
             name: "-Password",
             description: "Password for UserPassword authentication");
 
-        command.AddOption(recompileOption);
         command.AddOption(appPathOption);
-        command.AddOption(appJsonPathOption);
-        command.AddOption(packageCachePathOption);
         command.AddOption(launchJsonPathOption);
         command.AddOption(launchJsonNameOption);
         command.AddOption(usernameOption);
@@ -62,64 +48,31 @@ public static class PublishCommand
 
         command.SetHandler(async (context) =>
         {
-            var recompile = context.ParseResult.GetValueForOption(recompileOption);
-            var appPath = context.ParseResult.GetValueForOption(appPathOption);
-            var appJsonPath = context.ParseResult.GetValueForOption(appJsonPathOption);
-            var packageCachePath = context.ParseResult.GetValueForOption(packageCachePathOption);
+            var appPath = context.ParseResult.GetValueForOption(appPathOption)!;
             var launchJsonPath = context.ParseResult.GetValueForOption(launchJsonPathOption)!;
             var launchJsonName = context.ParseResult.GetValueForOption(launchJsonNameOption)!;
             var username = context.ParseResult.GetValueForOption(usernameOption);
             var password = context.ParseResult.GetValueForOption(passwordOption);
 
-            await ExecuteAsync(recompile, appPath, appJsonPath, packageCachePath,
-                launchJsonPath, launchJsonName, username, password);
+            await ExecuteAsync(appPath, launchJsonPath, launchJsonName, username, password);
         });
 
         return command;
     }
 
     private static async Task ExecuteAsync(
-        bool recompile,
-        string? appPath,
-        string? appJsonPath,
-        string? packageCachePath,
+        string appPath,
         string launchJsonPath,
         string launchJsonName,
         string? username,
         string? password)
     {
-        // Validate options
-        if (recompile)
-        {
-            if (string.IsNullOrEmpty(appJsonPath))
-            {
-                WriteError("Error: -appJsonPath is required when using -recompile");
-                Environment.ExitCode = 1;
-                return;
-            }
-        }
-        else
-        {
-            if (string.IsNullOrEmpty(appPath))
-            {
-                WriteError("Error: -appPath is required when not using -recompile");
-                Environment.ExitCode = 1;
-                return;
-            }
-        }
-
         var publishService = new PublishService();
         var result = await publishService.PublishAsync(
-            recompile, appPath, appJsonPath, packageCachePath,
-            launchJsonPath, launchJsonName, username, password);
+            appPath, launchJsonPath, launchJsonName, username, password);
 
         Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, JsonContext.Default.PublishResult));
 
         Environment.ExitCode = result.Success ? 0 : 1;
-    }
-
-    private static void WriteError(string message)
-    {
-        Console.Error.WriteLine(message);
     }
 }
