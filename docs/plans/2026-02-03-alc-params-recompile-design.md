@@ -162,6 +162,16 @@ Update quick-start example to show `compile` then `publish` workflow.
 | `src/Services/PublishService.cs` | Simplify `PublishAsync` signature, remove recompile logic |
 | `README.md` | Update compile and publish command documentation |
 
+## Design Decisions
+
+1. **Breaking change handling**: Just remove `-recompile` without deprecation. This is a dev CLI and users can adapt by running `compile` then `publish`.
+
+2. **CLI option casing**: Use camelCase for new options (`-generateReportLayout`) to match VS Code `settings.json` property names, even though existing auth options use PascalCase (`-Username`). The distinction makes sense: compiler options mirror VS Code settings, auth options are standalone.
+
+3. **Validation**: Validate `maxDegreeOfParallelism > 0` in CompileCommand before calling the service. No special handling for `parallel=false` + `maxDegreeOfParallelism` - let alc.exe handle that interaction.
+
+4. **Compiler version compatibility**: Not gated. If an older compiler doesn't support a flag, it will fail with a clear error from alc.exe itself.
+
 ## Testing
 
 - Existing tests using `CompilerService.CompileAsync` continue to work (new params have defaults)
