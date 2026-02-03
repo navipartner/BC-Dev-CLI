@@ -40,7 +40,19 @@ public class CompilerService
     /// <param name="compilerPath">Path to alc.exe compiler</param>
     /// <param name="packageCachePath">Path to .alpackages folder</param>
     /// <param name="suppressWarnings">If true, warnings are not included in the result</param>
-    public async Task<CompileResult> CompileAsync(string appJsonPath, string compilerPath, string? packageCachePath, bool suppressWarnings = false)
+    /// <param name="generateReportLayout">If set, controls whether report layouts are generated</param>
+    /// <param name="parallel">If set, controls whether parallel compilation is enabled</param>
+    /// <param name="maxDegreeOfParallelism">If set, specifies the maximum degree of parallelism</param>
+    /// <param name="continueBuildOnError">If set, controls whether to continue building on error</param>
+    public async Task<CompileResult> CompileAsync(
+        string appJsonPath,
+        string compilerPath,
+        string? packageCachePath,
+        bool suppressWarnings = false,
+        bool? generateReportLayout = null,
+        bool? parallel = null,
+        int? maxDegreeOfParallelism = null,
+        bool? continueBuildOnError = null)
     {
         var result = new CompileResult();
 
@@ -83,23 +95,24 @@ public class CompilerService
             packageCachePath = Path.Combine(appFolder, ".alpackages");
         }
 
-        // Build compiler arguments
-        var args = new List<string>
-        {
-            $"/project:\"{appFolder}\"",
-            $"/out:\"{outputPath}\""
-        };
+        // Only include packageCachePath if directory exists
+        var effectivePackageCachePath = Directory.Exists(packageCachePath) ? packageCachePath : null;
 
-        if (Directory.Exists(packageCachePath))
-        {
-            args.Add($"/packagecachepath:\"{packageCachePath}\"");
-        }
+        // Build compiler arguments
+        var arguments = BuildCompilerArguments(
+            appFolder,
+            outputPath,
+            effectivePackageCachePath,
+            generateReportLayout,
+            parallel,
+            maxDegreeOfParallelism,
+            continueBuildOnError);
 
         // Execute compiler
         var startInfo = new ProcessStartInfo
         {
             FileName = compilerPath,
-            Arguments = string.Join(" ", args),
+            Arguments = arguments,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
