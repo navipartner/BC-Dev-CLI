@@ -40,9 +40,10 @@ public static class CompileCommand
             description: "Maximum number of concurrent compilation tasks",
             getDefaultValue: () => 4);
 
-        var continueBuildOnErrorOption = new Option<bool?>(
+        var continueBuildOnErrorOption = new Option<bool>(
             name: "-continueBuildOnError",
-            description: "Continue building even if errors are found");
+            description: "Continue building even if errors are found",
+            getDefaultValue: () => true);
 
         command.AddOption(appJsonPathOption);
         command.AddOption(packageCachePathOption);
@@ -84,7 +85,7 @@ public static class CompileCommand
         bool generateReportLayout,
         bool parallel,
         int maxDegreeOfParallelism,
-        bool? continueBuildOnError)
+        bool continueBuildOnError)
     {
         // Auto-download compiler based on app.json platform version
         var artifactService = new ArtifactService();
