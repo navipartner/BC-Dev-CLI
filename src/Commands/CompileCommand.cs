@@ -25,17 +25,20 @@ public static class CompileCommand
             description: "Suppress compiler warnings from the output",
             getDefaultValue: () => false);
 
-        var generateReportLayoutOption = new Option<bool?>(
+        var generateReportLayoutOption = new Option<bool>(
             name: "-generateReportLayout",
-            description: "Generate report layout files during compilation");
+            description: "Generate report layout files during compilation",
+            getDefaultValue: () => false);
 
-        var parallelOption = new Option<bool?>(
+        var parallelOption = new Option<bool>(
             name: "-parallel",
-            description: "Enable parallel compilation");
+            description: "Enable parallel compilation",
+            getDefaultValue: () => true);
 
-        var maxDegreeOfParallelismOption = new Option<int?>(
+        var maxDegreeOfParallelismOption = new Option<int>(
             name: "-maxDegreeOfParallelism",
-            description: "Maximum number of concurrent compilation tasks");
+            description: "Maximum number of concurrent compilation tasks",
+            getDefaultValue: () => 4);
 
         var continueBuildOnErrorOption = new Option<bool?>(
             name: "-continueBuildOnError",
@@ -59,8 +62,8 @@ public static class CompileCommand
             var maxDegreeOfParallelism = context.ParseResult.GetValueForOption(maxDegreeOfParallelismOption);
             var continueBuildOnError = context.ParseResult.GetValueForOption(continueBuildOnErrorOption);
 
-            // Validate maxDegreeOfParallelism if provided
-            if (maxDegreeOfParallelism.HasValue && maxDegreeOfParallelism.Value <= 0)
+            // Validate maxDegreeOfParallelism
+            if (maxDegreeOfParallelism <= 0)
             {
                 Console.Error.WriteLine("Error: -maxDegreeOfParallelism must be greater than 0");
                 context.ExitCode = 1;
@@ -78,9 +81,9 @@ public static class CompileCommand
         string appJsonPath,
         string? packageCachePath,
         bool suppressWarnings,
-        bool? generateReportLayout,
-        bool? parallel,
-        int? maxDegreeOfParallelism,
+        bool generateReportLayout,
+        bool parallel,
+        int maxDegreeOfParallelism,
         bool? continueBuildOnError)
     {
         // Auto-download compiler based on app.json platform version
