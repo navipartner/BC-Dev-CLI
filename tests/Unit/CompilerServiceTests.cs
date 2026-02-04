@@ -146,4 +146,23 @@ public class CompilerServiceTests
         Assert.Contains("/maxdegreeofparallelism:4", args);
         Assert.Contains("/continuebuildonerror-", args);
     }
+
+    [Fact]
+    public void BuildArguments_WithDefaults_ProducesExpectedFlags()
+    {
+        // These are the new defaults: parallel=true, maxDegreeOfParallelism=4, generateReportLayout=false
+        var args = CompilerService.BuildCompilerArguments(
+            projectPath: "/project",
+            outputPath: "/out.app",
+            packageCachePath: null,
+            generateReportLayout: false,
+            parallel: true,
+            maxDegreeOfParallelism: 4,
+            continueBuildOnError: null);
+
+        Assert.Contains("/parallel+", args);
+        Assert.Contains("/maxdegreeofparallelism:4", args);
+        Assert.Contains("/generatereportlayout-", args);
+        Assert.DoesNotContain("/continuebuildonerror", args);
+    }
 }
